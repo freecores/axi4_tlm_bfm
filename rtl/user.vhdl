@@ -34,12 +34,11 @@
 	Public License along with this source; if not, download it 
 	from http://www.opencores.org/lgpl.shtml.
 */
-library ieee; use ieee.std_logic_1164.all, ieee.numeric_std.all;
---library tauhop; use tauhop.types.all, tauhop.genericMethods.all, tauhop.transactor.all, tauhop.axiTransactor.all;
+library ieee; use ieee.std_logic_1164.all, ieee.numeric_std.all; use ieee.math_real.all;
 library tauhop; use tauhop.transactor.all, tauhop.axiTransactor.all;
-/* synthesis translate_off */
-library osvvm; use osvvm.RandomPkg.all; use osvvm.CoveragePkg.all;
-/* synthesis translate_on */
+--/* synthesis translate_off */
+--library osvvm; use osvvm.RandomPkg.all; use osvvm.CoveragePkg.all;
+--/* synthesis translate_on */
 
 entity user is port(
 	/* Comment-out for simulation. */
@@ -147,25 +146,28 @@ begin
 		variable isPktError:boolean;
 		
 		/* Simulation-only randomisation. */
-		variable rv0,rv1:RandomPType;
+		variable seed0,seed1:positive:=1;
+		variable rand0,rand1:real;
 		
 	begin
 		if reset then
-			rv0.InitSeed(rv0'instance_name);
-			rv1.InitSeed(rv1'instance_name);
---			symbolsPerTransfer<=to_unsigned(maxSymbols,symbolsPerTransfer'length);
-			symbolsPerTransfer<=120x"0" & rv0.RandUnsigned(8);
+			seed0:=1; seed1:=1;
+			
+			uniform(seed0,seed1,rand0);
+			symbolsPerTransfer<=120x"0" & to_unsigned(integer(rand0*4096.0),8);
 		elsif falling_edge(irq_write) then
 			if outstandingTransactions>0 then
-				writeStream(48x"0" & rv1.RandUnsigned(16));		--axiMaster_out.tData'length));
+				uniform(seed0,seed1,rand0);
+				writeStream(to_unsigned(integer(rand0*4096.0),64));
 				
 			else
 				/* Testcase 1: number of symbols per transfer becomes 0 after first stream transfer. */
 				--symbolsPerTransfer<=(others=>'0');
 				
 				/* Testcase 2: number of symbols per transfer is randomised. */
-				symbolsPerTransfer<=120x"0" & rv0.RandUnsigned(8);	--symbolsPerTransfer'length
-				report "symbols per transfer = " & ieee.numeric_std.to_hstring(rv0.RandUnsigned(16));	--axiMaster_out.tData'length));
+				uniform(seed0,seed1,rand0);
+				symbolsPerTransfer<=120x"0" & to_unsigned(integer(rand0*4096.0),8);	--symbolsPerTransfer'length
+				report "symbols per transfer = " & ieee.numeric_std.to_hstring(to_unsigned(integer(rand0*4096.0),8));	--axiMaster_out.tData'length));
 			end if;
 		end if;
 	end process sequencer;

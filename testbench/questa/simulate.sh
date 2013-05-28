@@ -52,7 +52,5 @@ vcom -2008 -work work ../../rtl/axi4-stream-bfm.vhdl \
 	| tee -ai ./simulate.log;
 
 vsim -t ps -do ./waves.do -voptargs="+acc" "work.user(rtl)";
-#vsim -t ps -do ./waves.do -voptargs="+acc" "work.system(structural)";
-#vsim -t ps -do ./waves.do -voptargs="+acc" work.cfg_multiArch;
 
 echo $(date "+[%Y-%m-%d %H:%M:%S]: simulation loaded.");
