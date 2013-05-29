@@ -147,18 +147,18 @@ begin
 		
 		/* Simulation-only randomisation. */
 		variable seed0,seed1:positive:=1;
-		variable rand0,rand1:real;
+		variable rand0:real;
 		
 	begin
 		if reset then
 			seed0:=1; seed1:=1;
 			
 			uniform(seed0,seed1,rand0);
-			symbolsPerTransfer<=120x"0" & to_unsigned(integer(rand0*4096.0),8);
+			symbolsPerTransfer<=120x"0" & to_unsigned(integer(rand0 * 2.0**8),8);
 		elsif falling_edge(irq_write) then
 			if outstandingTransactions>0 then
 				uniform(seed0,seed1,rand0);
-				writeStream(to_unsigned(integer(rand0*4096.0),64));
+				writeStream(to_unsigned(integer(rand0 * 2.0**31),64));
 				
 			else
 				/* Testcase 1: number of symbols per transfer becomes 0 after first stream transfer. */
@@ -166,8 +166,8 @@ begin
 				
 				/* Testcase 2: number of symbols per transfer is randomised. */
 				uniform(seed0,seed1,rand0);
-				symbolsPerTransfer<=120x"0" & to_unsigned(integer(rand0*4096.0),8);	--symbolsPerTransfer'length
-				report "symbols per transfer = " & ieee.numeric_std.to_hstring(to_unsigned(integer(rand0*4096.0),8));	--axiMaster_out.tData'length));
+				symbolsPerTransfer<=120x"0" & to_unsigned(integer(rand0 * 2.0**8),8);	--symbolsPerTransfer'length
+				report "symbols per transfer = " & ieee.numeric_std.to_hstring(to_unsigned(integer(rand0 * 2.0**8),8));	--axiMaster_out.tData'length));
 			end if;
 		end if;
 	end process sequencer;
