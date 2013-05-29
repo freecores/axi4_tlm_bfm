@@ -46,10 +46,14 @@ vcom -2008 -work tauhop ../../rtl/packages/pkg-tlm.vhdl \
 	../../rtl/packages/pkg-axi-tlm.vhdl \
 	| tee -ai ./simulate.log;
 
-vcom -2008 -work work ../../rtl/axi4-stream-bfm.vhdl \
+vcom -2008 -work work ../../rtl/axi4-stream-bfm-master.vhdl \
 	../../rtl/user.vhdl \
 	| tee -ai ./simulate.log;
 
-vsim -t ps -do ./waves.do -voptargs="+acc" "work.user(rtl)";
+errorStr=`grep "\*\* Error: " ./simulate.log`
+if [ `echo ${#errorStr}` -gt 0 ]
+then echo "Errors exist. Exiting."; exit;
+else vsim -t ps -do ./waves.do -voptargs="+acc" "work.user(rtl)";
+fi
 
 echo $(date "+[%Y-%m-%d %H:%M:%S]: simulation loaded.");
