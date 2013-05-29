@@ -55,7 +55,7 @@ package axiTLM is
 --	subtype t_resp is unsigned(1 downto 0);		--2 bits. b"00" = OKAY, b"01" = ExOKAY, b"10" = SLVERR (slave error), b"11" = DECERR (decode error).
 	
 	/* AXI Transactor block interfaces. */
-	type tAxi4Transactor_m2s is record
+	type t_axi4Transactor_m2s is record
 		/* Address must be unresolved, because you need to drive the read address only when read is asserted, and 
 			drive the write address when write is asserted. Resolution functions are not expected to know how to decide this.
 		*/
@@ -104,9 +104,9 @@ package axiTLM is
 		
 		/* Read data channel. */
 		rReady:boolean;
-	end record tAxi4Transactor_m2s;
+	end record t_axi4Transactor_m2s;
 	
-	type tAxi4Transactor_s2m is record
+	type t_axi4Transactor_s2m is record
 		/* Write address channel. */
 		awReady:boolean;
 		
@@ -131,9 +131,9 @@ package axiTLM is
 		rValid:boolean;
 		rData:t_msg;
 		rResp:t_resp;
-	end record tAxi4Transactor_s2m;
+	end record t_axi4Transactor_s2m;
 	
-	type tAxi4StreamTransactor_m2s is record
+	type t_axi4StreamTransactor_m2s is record
 		/* AXI4 streaming interface. */
 		tValid:boolean;
 		tData:t_msg;
@@ -143,11 +143,11 @@ package axiTLM is
 		tId:t_id;
 		tDest:t_dest;
 		tUser:t_user;
-	end record tAxi4StreamTransactor_m2s;
+	end record t_axi4StreamTransactor_m2s;
 	
-	type tAxi4StreamTransactor_s2m is record
+	type t_axi4StreamTransactor_s2m is record
 		tReady:boolean;
-	end record tAxi4StreamTransactor_s2m;
+	end record t_axi4StreamTransactor_s2m;
 	
 --	/* AXI Low-power interface. */
 --	type tAxiTransactor_lp is record

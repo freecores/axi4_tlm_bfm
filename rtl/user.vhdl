@@ -45,8 +45,8 @@ entity user is port(
 --	clk,reset:in std_ulogic;
 	
 	/* AXI Master interface */
---	axiMaster_in:in tAxi4StreamTransactor_s2m;
-	axiMaster_out:buffer tAxi4StreamTransactor_m2s
+--	axiMaster_in:in t_axi4StreamTransactor_s2m;
+	axiMaster_out:buffer t_axi4StreamTransactor_m2s
 	
 	/* Debug ports. */
 );
@@ -59,16 +59,16 @@ architecture rtl of user is
 	signal outstandingTransactions:t_cnt;
 	
 	/* BFM signalling. */
-	signal readRequest,next_readRequest:tBfmCtrl:=((others=>'0'),(others=>'0'),false);
-	signal writeRequest,next_writeRequest:tBfmCtrl:=((others=>'0'),(others=>'0'),false);
-	signal readResponse,next_readResponse:tBfmCtrl;
-	signal writeResponse,next_writeResponse:tBfmCtrl;
+	signal readRequest,next_readRequest:t_bfm:=((others=>'0'),(others=>'0'),false);
+	signal writeRequest,next_writeRequest:t_bfm:=((others=>'0'),(others=>'0'),false);
+	signal readResponse,next_readResponse:t_bfm;
+	signal writeResponse,next_writeResponse:t_bfm;
 	
 	
 	/* Tester signals. */
 	/* synthesis translate_off */
 	signal clk,reset:std_ulogic:='0';
-	signal axiMaster_in:tAxi4StreamTransactor_s2m;
+	signal axiMaster_in:t_axi4StreamTransactor_s2m;
 	/* synthesis translate_on */
 	
 	signal irq_write:std_ulogic;		-- clock gating.

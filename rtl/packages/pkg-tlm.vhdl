@@ -52,32 +52,32 @@ package tlm is
 --	subtype t_msg is signed(63 downto 0);
 	
 	/* BFM control interface. */
-	type tBfmCtrl is record
+	type t_bfm is record
 		address:t_addr;
 		message:t_msg;
 		trigger:boolean;
-	end record tBfmCtrl;
+	end record t_bfm;
 	
 	procedure write(
-		signal request:inout tBfmCtrl;		--FIXME use inout because Quartus doesn't yet allow reading of "out" within a procedure. VHDL-2008 allows this, and QuestaSim works fine.
+		signal request:inout t_bfm;		--FIXME use inout because Quartus doesn't yet allow reading of "out" within a procedure. VHDL-2008 allows this, and QuestaSim works fine.
 		address:in t_addr;
 		data:in t_msg
 	);
 	
 	procedure writeStream(
-		signal request:inout tBfmCtrl;
+		signal request:inout t_bfm;
 		data:in t_msg
 	);
 	
 	procedure read(
-		signal request:inout tBfmCtrl;		--FIXME use inout because Quartus doesn't yet allow reading of "out" within a procedure. VHDL-2008 allows this, and QuestaSim works fine.
+		signal request:inout t_bfm;		--FIXME use inout because Quartus doesn't yet allow reading of "out" within a procedure. VHDL-2008 allows this, and QuestaSim works fine.
 		address:in t_addr
 	);
 end package tlm;
 
 package body tlm is
 	procedure write(
-		signal request:inout tBfmCtrl;		--FIXME use inout because Quartus doesn't yet allow reading of "out" within a procedure. VHDL-2008 allows this, and QuestaSim works fine.
+		signal request:inout t_bfm;		--FIXME use inout because Quartus doesn't yet allow reading of "out" within a procedure. VHDL-2008 allows this, and QuestaSim works fine.
 		address:in t_addr;
 		data:in t_msg
 	) is begin
@@ -87,7 +87,7 @@ package body tlm is
 	end procedure write;
 	
 	procedure writeStream(
-		signal request:inout tBfmCtrl;
+		signal request:inout t_bfm;
 		data:in t_msg
 	) is begin
 		request.message<=data;
@@ -95,7 +95,7 @@ package body tlm is
 	end procedure writeStream;
 	
 	procedure read(
-		signal request:inout tBfmCtrl;		--FIXME use inout because Quartus doesn't yet allow reading of "out" within a procedure. VHDL-2008 allows this, and QuestaSim works fine.
+		signal request:inout t_bfm;		--FIXME use inout because Quartus doesn't yet allow reading of "out" within a procedure. VHDL-2008 allows this, and QuestaSim works fine.
 		address:in t_addr
 	) is begin
 		request.address<=address;

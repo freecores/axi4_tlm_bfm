@@ -47,12 +47,12 @@ entity axiBfmMaster is --generic(constant maxTransactions:positive);
 		trigger:in boolean;
 		
 		/* BFM signalling. */
-		readRequest,writeRequest:in tBfmCtrl:=((others=>'X'),(others=>'X'),false);	-- this is tauhop.transactor.tBfmCtrl.
-		readResponse,writeResponse:buffer tBfmCtrl;									-- use buffer until synthesis tools support reading from out ports.
+		readRequest,writeRequest:in t_bfm:=((others=>'X'),(others=>'X'),false);	-- this is tauhop.transactor.t_bfm.
+		readResponse,writeResponse:buffer t_bfm;									-- use buffer until synthesis tools support reading from out ports.
 		
 		/* AXI Master interface */
-		axiMaster_in:in tAxi4StreamTransactor_s2m;
-		axiMaster_out:buffer tAxi4StreamTransactor_m2s;
+		axiMaster_in:in t_axi4StreamTransactor_s2m;
+		axiMaster_out:buffer t_axi4StreamTransactor_m2s;
 		
 --		/* AXI Slave interface */
 --		axiSlave_in:in tAxi4Transactor_m2s;
@@ -73,11 +73,11 @@ architecture rtl of axiBfmMaster is
 	signal axiTxState,next_axiTxState:axiBfmStatesTx:=idle;
 	
 	/* General pipelines. */
-	signal i_axiMaster_out:tAxi4StreamTransactor_m2s;
+	signal i_axiMaster_out:t_axi4StreamTransactor_m2s;
 	
 	/* BFM signalling. */
-	signal i_readRequest:tBfmCtrl:=((others=>'0'),(others=>'0'),false);
-	signal i_writeRequest:tBfmCtrl:=((others=>'0'),(others=>'0'),false);
+	signal i_readRequest:t_bfm:=((others=>'0'),(others=>'0'),false);
+	signal i_writeRequest:t_bfm:=((others=>'0'),(others=>'0'),false);
 	
 	signal response,i_response:boolean;
 	
