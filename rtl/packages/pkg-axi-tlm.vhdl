@@ -180,7 +180,7 @@ end package body axiTLM;
 library ieee; use ieee.std_logic_1164.all, ieee.numeric_std.all;
 library tauhop;
 package transactor is new tauhop.tlm generic map(
-	t_addr=>unsigned(31 downto 0),
+	t_addr=>unsigned(31 downto 0),		-- default assignment. Used only for non-stream interfaces.
 	t_msg=>unsigned(63 downto 0),
 	t_cnt=>unsigned(127 downto 0)
 );

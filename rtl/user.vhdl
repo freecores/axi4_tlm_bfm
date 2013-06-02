@@ -98,11 +98,7 @@ begin
 			axiMaster_out=>axiMaster_out,
 			
 			symbolsPerTransfer=>symbolsPerTransfer,
-			outstandingTransactions=>outstandingTransactions,
-			
-			dbg_cnt=>open,
-			dbg_axiRxFsm=>open,
-			dbg_axiTxFsm=>open
+			outstandingTransactions=>outstandingTransactions
 	);
 	
 	/* Simulation Tester. */
@@ -126,22 +122,19 @@ begin
 	/* Stimuli sequencer. */
 	sequencer: process(reset,irq_write) is
 		/* Local procedures to map BFM signals with the package procedure. */
-		procedure read(address:in unsigned(31 downto 0)) is begin
+		procedure read(address:in t_addr) is begin
 			read(readRequest,address);
 		end procedure read;
 		
-		procedure write(
-			address:in t_addr;
-			data:in t_msg
-		) is begin
-			write(writeRequest,address,data);
+		procedure write(data:in t_msg) is begin
+			write(request=>writeRequest, address=>(others=>'-'), data=>data);
 		end procedure write;
 		
-		procedure writeStream(
-			data:in t_msg
-		) is begin
-			writeStream(writeRequest,data);
-		end procedure writeStream;
+--		procedure writeStream(
+--			data:in t_msg
+--		) is begin
+--			writeStream(writeRequest,data);
+--		end procedure writeStream;
 		
 		variable isPktError:boolean;
 		
@@ -158,7 +151,7 @@ begin
 		elsif falling_edge(irq_write) then
 			if outstandingTransactions>0 then
 				uniform(seed0,seed1,rand0);
-				writeStream(to_unsigned(integer(rand0 * 2.0**31),64));
+				write(to_unsigned(integer(rand0 * 2.0**31),64));
 				
 			else
 				/* Testcase 1: number of symbols per transfer becomes 0 after first stream transfer. */

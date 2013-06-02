@@ -52,7 +52,7 @@ vcom -2008 -work work ../../rtl/axi4-stream-bfm-master.vhdl \
 
 errorStr=`grep "\*\* Error: " ./simulate.log`
 if [ `echo ${#errorStr}` -gt 0 ]
-then echo "Errors exist. Exiting."; exit;
+then echo "Errors exist. Refer simulate.log for more details. Exiting."; exit;
 else vsim -t ps -do ./waves.do -voptargs="+acc" "work.user(rtl)";
 fi
 
