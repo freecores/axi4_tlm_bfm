@@ -36,10 +36,10 @@
 	from http://www.opencores.org/lgpl.shtml.
 */
 library ieee; use ieee.std_logic_1164.all, ieee.numeric_std.all;
-library tauhop; use tauhop.transactor.all, tauhop.axiTransactor.all;
+--library tauhop; use tauhop.transactor.all, tauhop.axiTransactor.all;
 
---/* TODO remove once generic packages are supported. */
---library tauhop; use tauhop.tlm.all, tauhop.axiTLM.all;
+/* TODO remove once generic packages are supported. */
+library tauhop; use tauhop.tlm.all, tauhop.axiTLM.all;
 
 entity axiBfmMaster is --generic(constant maxTransactions:positive);
 	port(aclk,n_areset:in std_ulogic;
@@ -59,7 +59,7 @@ entity axiBfmMaster is --generic(constant maxTransactions:positive);
 --		axiSlave_out:buffer tAxi4Transactor_s2m;
 		
 		symbolsPerTransfer:in t_cnt;
-		outstandingTransactions:out t_cnt
+		outstandingTransactions:buffer t_cnt
 		
 		/* Debug ports. */
 --		dbg_cnt:out unsigned(9 downto 0);

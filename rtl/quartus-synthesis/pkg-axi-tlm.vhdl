@@ -41,18 +41,20 @@ library tauhop;
 
 /* Record I/O data structures for AXI interface transactor (block interface). */
 package axiTLM is
-	generic(
-		type t_qualifier; type t_id; type t_dest; type t_user; type t_resp;
-		package transactor is new tauhop.tlm generic map(<>)
-	);
-	/* Makes transactor.t_addr and transactor.t_msg visible. */
-	use transactor.all;
+--	generic(
+--		type t_qualifier; type t_id; type t_dest; type t_user; type t_resp;
+--		package transactor is new tauhop.tlm generic map(<>)
+--	);
+--	/* Makes transactor.t_addr and transactor.t_msg visible. */
+--	use transactor.all;
 	
---	/* TODO remove once generic packages are supported. */
---	use tauhop.tlm.all;
---	subtype t_qualifier is std_ulogic_vector(32/8-1 downto 0);
---	subtype t_id is unsigned(31 downto 0);
---	subtype t_resp is unsigned(1 downto 0);		--2 bits. b"00" = OKAY, b"01" = ExOKAY, b"10" = SLVERR (slave error), b"11" = DECERR (decode error).
+	/* TODO remove once generic packages are supported. */
+	use tauhop.tlm.all;
+	subtype t_qualifier is std_ulogic_vector(32/8-1 downto 0);
+	subtype t_id is unsigned(31 downto 0);
+	subtype t_dest is unsigned(3 downto 0);
+	subtype t_user is unsigned(7 downto 0);
+	subtype t_resp is unsigned(1 downto 0);		--2 bits. b"00" = OKAY, b"01" = ExOKAY, b"10" = SLVERR (slave error), b"11" = DECERR (decode error).
 	
 	/* AXI Transactor block interfaces. */
 	type t_axi4Transactor_m2s is record
@@ -177,7 +179,7 @@ end package body axiTLM;
  * 	axiTransactor instantiates the axiTLM, and assigns specific types to the 
  * 		transactor model.
  */
-library ieee; use ieee.std_logic_1164.all, ieee.numeric_std.all;
+/*library ieee; use ieee.std_logic_1164.all, ieee.numeric_std.all;
 library tauhop;
 package transactor is new tauhop.tlm generic map(
 	t_addr=>unsigned(31 downto 0),		-- default assignment. Used only for non-stream interfaces.
@@ -195,3 +197,4 @@ package axiTransactor is new tauhop.axiTLM generic map(
 	t_resp=>unsigned(1 downto 0),	--only used for AXI4-Lite (non-streaming).
 	transactor=>tauhop.transactor
 );
+*/

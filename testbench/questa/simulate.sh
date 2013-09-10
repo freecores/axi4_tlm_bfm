@@ -34,13 +34,13 @@ rm -rf modelsim.ini ./simulate.log ./work ./altera ./osvvm ./tauhop;
 echo $(date "+[%Y-%m-%d %H:%M:%S]: Remove successful.");
 echo $(date "+[%Y-%m-%d %H:%M:%S]: Compiling project...");
 vlib work; vmap work work;
-#vlib osvvm; vmap osvvm osvvm;
+vlib osvvm; vmap osvvm osvvm;
 vlib tauhop; vmap tauhop tauhop;
 
-#vcom -2008 -work osvvm ../../rtl/packages/os-vvm/SortListPkg_int.vhd \
-#	../../rtl/packages/os-vvm/RandomBasePkg.vhd \
-#	../../rtl/packages/os-vvm/RandomPkg.vhd \
-#	../../rtl/packages/os-vvm/CoveragePkg.vhd;
+vcom -2008 -work osvvm ../../rtl/packages/os-vvm/SortListPkg_int.vhd \
+	../../rtl/packages/os-vvm/RandomBasePkg.vhd \
+	../../rtl/packages/os-vvm/RandomPkg.vhd \
+	../../rtl/packages/os-vvm/CoveragePkg.vhd;
 
 vcom -2008 -work tauhop ../../rtl/packages/pkg-tlm.vhdl \
 	../../rtl/packages/pkg-axi-tlm.vhdl \
@@ -53,7 +53,7 @@ vcom -2008 -work work ../../rtl/axi4-stream-bfm-master.vhdl \
 errorStr=`grep "\*\* Error: " ./simulate.log`
 if [ `echo ${#errorStr}` -gt 0 ]
 then echo "Errors exist. Refer simulate.log for more details. Exiting."; exit;
-else vsim -t ps -do ./waves.do -voptargs="+acc" "work.user(rtl)";
+else
+	vsim -t ps -do ./waves.do -voptargs="+acc" "work.user(rtl)";
+	echo $(date "+[%Y-%m-%d %H:%M:%S]: simulation loaded.");
 fi
-
-echo $(date "+[%Y-%m-%d %H:%M:%S]: simulation loaded.");
