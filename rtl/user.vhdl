@@ -59,11 +59,14 @@ architecture rtl of user is
 	signal outstandingTransactions:t_cnt;
 	
 	/* BFM signalling. */
-	signal readRequest,next_readRequest:t_bfm:=((others=>'0'),(others=>'0'),false);
-	signal writeRequest,next_writeRequest:t_bfm:=((others=>'0'),(others=>'0'),false);
-	signal readResponse,next_readResponse:t_bfm;
-	signal writeResponse,next_writeResponse:t_bfm;
+	signal readRequest:t_bfm:=((others=>'0'),(others=>'0'),false);
+	signal writeRequest:t_bfm:=((others=>'0'),(others=>'0'),false);
+	signal readResponse:t_bfm;
+	signal writeResponse:t_bfm;
 	
+	type txStates is (idle,transmitting);
+	signal txFSM,i_txFSM:txStates;
+	--signal response,i_response:boolean;
 	
 	/* Tester signals. */
 	/* synthesis translate_off */
@@ -74,23 +77,10 @@ architecture rtl of user is
 	signal irq_write:std_ulogic;		-- clock gating.
 	
 begin
-	/* pipelines. */
-	process(clk) is begin
-		if rising_edge(clk) then
-			next_readRequest<=readRequest;
-			next_writeRequest<=writeRequest;
-			next_readResponse<=readResponse;
-			next_writeResponse<=writeResponse;
-		end if;
-	end process;
-	
-	
 	/* Bus functional models. */
 	axiMaster: entity work.axiBfmMaster(rtl)
---		generic map(maxTransactions=>maxSymbols)
 		port map(
 			aclk=>irq_write, n_areset=>not reset,
-			trigger=>irq_write='1',
 			
 			readRequest=>readRequest,	writeRequest=>writeRequest,
 			readResponse=>readResponse,	writeResponse=>writeResponse,
@@ -118,9 +108,55 @@ begin
 	/* Hardware tester. */
 	
 	
-	/* Stimuli sequencer. */
-	axiMaster_in.tReady<=true when axiMaster_out.tValid and falling_edge(clk);
+	/* Stimuli sequencer. TODO move to tester/stimuli.
+		This emulates the AXI4-Stream Slave.
+	*/
+	/* synthesis translate_off */
+	process is begin
+		/* Fast read. */
+		while not axiMaster_out.tLast loop
+			/* Wait for tValid to assert. */
+			while not axiMaster_out.tValid loop
+				wait until falling_edge(clk);
+			end loop;
+			
+			axiMaster_in.tReady<=true;
+			
+			wait until falling_edge(clk);
+			axiMaster_in.tReady<=false;
+		end loop;
+		
+		wait until falling_edge(clk);
+		
+		/* Normal read. */
+		while not axiMaster_out.tLast loop
+			/* Wait for tValid to assert. */
+			while not axiMaster_out.tValid loop
+				wait until falling_edge(clk);
+			end loop;
+			
+			wait until falling_edge(clk);
+			axiMaster_in.tReady<=true;
+			
+			wait until falling_edge(clk);
+			axiMaster_in.tReady<=false;
+		end loop;
+		
+		for i in 0 to 10 loop
+			wait until falling_edge(clk);
+		end loop;
+		
+		/* One-shot read. */
+		axiMaster_in.tReady<=true;
+		
+		wait until falling_edge(clk);
+		axiMaster_in.tReady<=false;
+		
+		wait;
+	end process;
+	/* synthesis translate_on */
 	
+	/* Data transmitter. */
 	sequencer: process(reset,irq_write) is
 		/* Local procedures to map BFM signals with the package procedure. */
 		procedure read(address:in t_addr) is begin
@@ -134,39 +170,45 @@ begin
 		variable isPktError:boolean;
 		
 		/* Simulation-only randomisation. */
-		variable rv0,rv1:RandomPType;
---		variable seed0,seed1:positive:=1;
---		variable rand0:real;
+		variable rv0:RandomPType;
 		
 	begin
 		if reset then
---			seed0:=1; seed1:=1;
---			uniform(seed0,seed1,rand0);
---			
---			symbolsPerTransfer<=120x"0" & to_unsigned(integer(rand0 * 2.0**8),8);
-			
 			rv0.InitSeed(rv0'instance_name);
-			rv1.InitSeed(rv1'instance_name);
-			symbolsPerTransfer<=120x"0" & rv0.RandUnsigned(8);
+			txFSM<=idle;
 		elsif falling_edge(irq_write) then
-			if outstandingTransactions>0 then
---				uniform(seed0,seed1,rand0);
---				write(to_signed(integer(rand0 * 2.0**31),64));
-				
-				write(rv1.RandSigned(axiMaster_out.tData'length));
-			else
-				/* Testcase 1: number of symbols per transfer becomes 0 after first stream transfer. */
-				--symbolsPerTransfer<=(others=>'0');
-				
-				/* Testcase 2: number of symbols per transfer is randomised. */
---				uniform(seed0,seed1,rand0);
---				symbolsPerTransfer<=120x"0" & to_unsigned(integer(rand0 * 2.0**8),8);	--symbolsPerTransfer'length
---				report "symbols per transfer = " & ieee.numeric_std.to_hstring(to_unsigned(integer(rand0 * 2.0**8),8));	--axiMaster_out.tData'length));
-				
-				/* Truncate symbolsPerTransfer to 8 bits, so that it uses a "small" value for simulation. */
+			case txFSM is
+				when idle=>
+					if outstandingTransactions>0 then
+						write(rv0.RandSigned(axiMaster_out.tData'length));
+						txFSM<=transmitting;
+					end if;
+				when transmitting=>
+					if writeResponse.trigger then
+						write(rv0.RandSigned(axiMaster_out.tData'length));
+					end if;
+					
+					if axiMaster_out.tLast then
+						txFSM<=idle;
+					end if;
+				when others=>null;
+			end case;
+		end if;
+	end process sequencer;
+	
+	/* Reset symbolsPerTransfer to new value (prepare for new transfer) after current transfer has been completed. */
+	process(reset,irq_write) is
+		variable rv0:RandomPType;
+	begin
+		if reset then
+			rv0.InitSeed(rv0'instance_name);
+			symbolsPerTransfer<=120x"0" & rv0.RandUnsigned(8);
+			report "symbols per transfer = 0x" & ieee.numeric_std.to_hstring(rv0.RandUnsigned(axiMaster_out.tData'length));
+		elsif rising_edge(irq_write) then
+			if axiMaster_out.tLast then
 				symbolsPerTransfer<=120x"0" & rv0.RandUnsigned(8);
 				report "symbols per transfer = 0x" & ieee.numeric_std.to_hstring(rv0.RandUnsigned(axiMaster_out.tData'length));
 			end if;
 		end if;
-	end process sequencer;
+	end process;
 end architecture rtl;

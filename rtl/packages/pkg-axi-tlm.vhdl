@@ -43,10 +43,10 @@ library tauhop;
 package axiTLM is
 	generic(
 		type t_qualifier; type t_id; type t_dest; type t_user; type t_resp;
-		package transactor is new tauhop.tlm generic map(<>)
+		package i_transactor is new tauhop.tlm generic map(<>)
 	);
-	/* Makes transactor.t_addr and transactor.t_msg visible. */
-	use transactor.all;
+	/* Makes i_transactor.t_addr, i_transactor.t_msg, and i_transactor.t_cnt visible. */
+	use i_transactor.all;
 	
 --	/* TODO remove once generic packages are supported. */
 --	use tauhop.tlm.all;
@@ -193,5 +193,5 @@ package axiTransactor is new tauhop.axiTLM generic map(
 	t_dest=>unsigned(3 downto 0),
 	t_user=>unsigned(7 downto 0),	--unsigned(86*2-1 downto 0),
 	t_resp=>unsigned(1 downto 0),	--only used for AXI4-Lite (non-streaming).
-	transactor=>tauhop.transactor
+	i_transactor=>tauhop.transactor
 );
