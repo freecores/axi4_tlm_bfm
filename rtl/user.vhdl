@@ -36,13 +36,17 @@
 */
 library ieee; use ieee.std_logic_1164.all, ieee.numeric_std.all; use ieee.math_real.all;
 library tauhop; use tauhop.transactor.all, tauhop.axiTransactor.all;		--TODO just use axiTransactor here as transactor should already be wrapped up.
+
+/* TODO remove once generic packages are supported. */
+--library tauhop; use tauhop.tlm.all, tauhop.axiTLM.all;
+
 /* synthesis translate_off */
 library osvvm; use osvvm.RandomPkg.all; use osvvm.CoveragePkg.all;
 /* synthesis translate_on */
 
 entity user is port(
 	/* Comment-out for simulation. */
---	clk,reset:in std_ulogic;
+--	clk,nReset:in std_ulogic;
 	
 	/* AXI Master interface */
 --	axiMaster_in:in t_axi4StreamTransactor_s2m;
@@ -66,21 +70,20 @@ architecture rtl of user is
 	
 	type txStates is (idle,transmitting);
 	signal txFSM,i_txFSM:txStates;
-	--signal response,i_response:boolean;
 	
 	/* Tester signals. */
 	/* synthesis translate_off */
-	signal clk,reset:std_ulogic:='0';
-	signal axiMaster_in:t_axi4StreamTransactor_s2m;
+	signal clk,nReset:std_ulogic:='0';
 	/* synthesis translate_on */
 	
+	signal axiMaster_in:t_axi4StreamTransactor_s2m;
 	signal irq_write:std_ulogic;		-- clock gating.
 	
 begin
 	/* Bus functional models. */
 	axiMaster: entity work.axiBfmMaster(rtl)
 		port map(
-			aclk=>irq_write, n_areset=>not reset,
+			aclk=>irq_write, n_areset=>nReset,
 			
 			readRequest=>readRequest,	writeRequest=>writeRequest,
 			readResponse=>readResponse,	writeResponse=>writeResponse,
@@ -92,15 +95,15 @@ begin
 	);
 	
 	/* Interrupt-request generator. */
-	irq_write<=clk when not reset else '0';
+	irq_write<=clk when nReset else '0';
 	
 	/* Simulation Tester. */
 	/* synthesis translate_off */
 	clk<=not clk after 10 ps;
 	process is begin
-		reset<='0'; wait for 1 ps;
-		reset<='1'; wait for 500 ps;
-		reset<='0';
+		nReset<='1'; wait for 1 ps;
+		nReset<='0'; wait for 500 ps;
+		nReset<='1';
 		wait;
 	end process;
 	/* synthesis translate_on */
@@ -111,6 +114,7 @@ begin
 	/* Stimuli sequencer. TODO move to tester/stimuli.
 		This emulates the AXI4-Stream Slave.
 	*/
+	/* Simulation-only stimuli sequencer. */
 	/* synthesis translate_off */
 	process is begin
 		/* Fast read. */
@@ -156,8 +160,11 @@ begin
 	end process;
 	/* synthesis translate_on */
 	
+	/* Synthesisable stimuli sequencer. */
+	
+	
 	/* Data transmitter. */
-	sequencer: process(reset,irq_write) is
+	sequencer: process(nReset,irq_write) is
 		/* Local procedures to map BFM signals with the package procedure. */
 		procedure read(address:in t_addr) is begin
 			read(readRequest,address);
@@ -169,23 +176,36 @@ begin
 		
 		variable isPktError:boolean;
 		
+		/* Tester variables. */
+        /* Synthesis-only randomisation. */
+		
 		/* Simulation-only randomisation. */
+		/* synthesis translate_off */
 		variable rv0:RandomPType;
+		/* synthesis translate_on */
 		
 	begin
-		if reset then
+		if not nReset then
+			/*simulation only. */
+			/* synthesis translate_off */
 			rv0.InitSeed(rv0'instance_name);
+			/* synthesis translate_on */
+			
 			txFSM<=idle;
 		elsif falling_edge(irq_write) then
 			case txFSM is
 				when idle=>
 					if outstandingTransactions>0 then
+						/* synthesis translate_off */
 						write(rv0.RandSigned(axiMaster_out.tData'length));
+						/* synthesis translate_on */
 						txFSM<=transmitting;
 					end if;
 				when transmitting=>
 					if writeResponse.trigger then
+						/* synthesis translate_off */
 						write(rv0.RandSigned(axiMaster_out.tData'length));
+						/* synthesis translate_on */
 					end if;
 					
 					if axiMaster_out.tLast then
@@ -197,17 +217,23 @@ begin
 	end process sequencer;
 	
 	/* Reset symbolsPerTransfer to new value (prepare for new transfer) after current transfer has been completed. */
-	process(reset,irq_write) is
+	process(nReset,irq_write) is
+		/* synthesis translate_off */
 		variable rv0:RandomPType;
+		/* synthesis translate_on */
 	begin
-		if reset then
+		if not nReset then
+			/* synthesis translate_off */
 			rv0.InitSeed(rv0'instance_name);
 			symbolsPerTransfer<=120x"0" & rv0.RandUnsigned(8);
 			report "symbols per transfer = 0x" & ieee.numeric_std.to_hstring(rv0.RandUnsigned(axiMaster_out.tData'length));
+			/* synthesis translate_on */
 		elsif rising_edge(irq_write) then
 			if axiMaster_out.tLast then
+				/* synthesis translate_off */
 				symbolsPerTransfer<=120x"0" & rv0.RandUnsigned(8);
 				report "symbols per transfer = 0x" & ieee.numeric_std.to_hstring(rv0.RandUnsigned(axiMaster_out.tData'length));
+				/* synthesis translate_on */
 			end if;
 		end if;
 	end process;

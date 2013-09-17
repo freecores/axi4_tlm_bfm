@@ -66,45 +66,34 @@ architecture rtl of user is
 	signal outstandingTransactions:t_cnt;
 	
 	/* BFM signalling. */
-	signal readRequest,next_readRequest:t_bfm:=((others=>'0'),(others=>'0'),false);
-	signal writeRequest,next_writeRequest:t_bfm:=((others=>'0'),(others=>'0'),false);
-	signal readResponse,next_readResponse:t_bfm;
-	signal writeResponse,next_writeResponse:t_bfm;
+	signal readRequest:t_bfm:=((others=>'0'),(others=>'0'),false);
+	signal writeRequest:t_bfm:=((others=>'0'),(others=>'0'),false);
+	signal readResponse:t_bfm;
+	signal writeResponse:t_bfm;
 	
+	type txStates is (idle,transmitting);
+	signal txFSM,i_txFSM:txStates;
 	
 	/* Tester signals. */
 	/* synthesis translate_off */
 	signal clk,nReset:std_ulogic:='0';
 	/* synthesis translate_on */
-	signal trigger:boolean;
+	--signal trigger:boolean;
 	signal anlysr_dataIn:std_logic_vector(127 downto 0);
 	signal anlysr_trigger:std_ulogic;
 	
 	/* Signal preservations for SignalTap II probing. */
-	attribute keep:boolean;
-	attribute keep of trigger:signal is true;
+	--attribute keep:boolean;
+	--attribute keep of trigger:signal is true;
 	
 	signal axiMaster_in:t_axi4StreamTransactor_s2m;
 	signal irq_write:std_ulogic;		-- clock gating.
 	
 begin
-	/* pipelines. */
-	process(clk) is begin
-		if rising_edge(clk) then
-			next_readRequest<=readRequest;
-			next_writeRequest<=writeRequest;
-			next_readResponse<=readResponse;
-			next_writeResponse<=writeResponse;
-		end if;
-	end process;
-	
-	
 	/* Bus functional models. */
 	axiMaster: entity work.axiBfmMaster(rtl)
---		generic map(maxTransactions=>maxSymbols)
 		port map(
 			aclk=>irq_write, n_areset=>nReset,
-			trigger=>irq_write='1',
 			
 			readRequest=>readRequest,	writeRequest=>writeRequest,
 			readResponse=>readResponse,	writeResponse=>writeResponse,
@@ -180,9 +169,59 @@ begin
 	
 	
 	
-	/* Stimuli sequencer. */
+	/* Stimuli sequencer. TODO move to tester/stimuli.
+		This emulates the AXI4-Stream Slave.
+	*/
+	/* Simulation-only stimuli sequencer. */
+	/* synthesis translate_off */
+	process is begin
+		/* Fast read. */
+		while not axiMaster_out.tLast loop
+			/* Wait for tValid to assert. */
+			while not axiMaster_out.tValid loop
+				wait until falling_edge(clk);
+			end loop;
+			
+			axiMaster_in.tReady<=true;
+			
+			wait until falling_edge(clk);
+			axiMaster_in.tReady<=false;
+		end loop;
+		
+		wait until falling_edge(clk);
+		
+		/* Normal read. */
+		while not axiMaster_out.tLast loop
+			/* Wait for tValid to assert. */
+			while not axiMaster_out.tValid loop
+				wait until falling_edge(clk);
+			end loop;
+			
+			wait until falling_edge(clk);
+			axiMaster_in.tReady<=true;
+			
+			wait until falling_edge(clk);
+			axiMaster_in.tReady<=false;
+		end loop;
+		
+		for i in 0 to 10 loop
+			wait until falling_edge(clk);
+		end loop;
+		
+		/* One-shot read. */
+		axiMaster_in.tReady<=true;
+		
+		wait until falling_edge(clk);
+		axiMaster_in.tReady<=false;
+		
+		wait;
+	end process;
+	/* synthesis translate_on */
+	
+	/* Synthesisable stimuli sequencer. */
 	axiMaster_in.tReady<=true when axiMaster_out.tValid and falling_edge(clk);
 	
+	/* Data transmitter. */
 	sequencer: process(nReset,irq_write) is
 		/* Local procedures to map BFM signals with the package procedure. */
 		procedure read(address:in t_addr) is begin
@@ -197,45 +236,67 @@ begin
 		
 		/* Tester variables. */
 		/* Synthesis-only randomisation. */
-		variable seed0,seed1:positive:=1;
-		--variable rand0:real;
 		variable rand0:signed(63 downto 0);
 		/* Simulation-only randomisation. */
 		/* synthesis translate_off */
-		variable rv0,rv1:RandomPType;
+		variable rv0:RandomPType;
 		/* synthesis translate_on */
 		
 	begin
 		if not nReset then
 			/* synthesis only. */
-			seed0:=1; seed1:=1;
-			--uniform(seed0,seed1,rand0);
 			rand0:=(others=>'0');
-			
-			--symbolsPerTransfer<=120x"0" & to_unsigned(integer(rand0 * 2.0**8),8);
-			symbolsPerTransfer<=128x"8";
-			
 			
 			/* simulation only. */
 			/* synthesis translate_off */
 			rv0.InitSeed(rv0'instance_name);
-			rv1.InitSeed(rv1'instance_name);
-			symbolsPerTransfer<=120x"0" & rv0.RandUnsigned(8);
 			/* synthesis translate_on */
+			
+			txFSM<=idle;
 		elsif falling_edge(irq_write) then
-			--write(64x"abcd1234");
-			if outstandingTransactions>0 then
-				/* synthesis only. */
-				--uniform(seed0,seed1,rand0);
-				--write(to_signed(integer(rand0 * 2.0**31),64));
-				write(rand0);
-				rand0:=rand0+1;
-				
-				/* simulation only. */
-				/* synthesis translate_off */
-				write(rv1.RandUnsigned(axiMaster_out.tData'length));
-				/* synthesis translate_on */
-			else
+			case txFSM is
+				when idle=>
+					if outstandingTransactions>0 then
+						/* synthesis translate_off */
+						write(rv0.RandSigned(axiMaster_out.tData'length));
+						/* synthesis translate_on */
+						write(rand0);
+						
+						txFSM<=transmitting;
+					end if;
+				when transmitting=>
+					if writeResponse.trigger then
+						/* synthesis translate_off */
+						write(rv0.RandSigned(axiMaster_out.tData'length));
+						/* synthesis translate_on */
+						write(rand0);
+						rand0:=rand0+1;
+					end if;
+					
+					if axiMaster_out.tLast then
+						txFSM<=idle;
+					end if;
+				when others=>null;
+			end case;
+		end if;
+	end process sequencer;
+	
+	/* Reset symbolsPerTransfer to new value (prepare for new transfer) after current transfer has been completed. */
+	process(nReset,irq_write) is
+		/* synthesis translate_off */
+		variable rv0:RandomPType;
+		/* synthesis translate_on */
+	begin
+		if not nReset then
+			/* synthesis translate_off */
+			rv0.InitSeed(rv0'instance_name);
+			symbolsPerTransfer<=120x"0" & rv0.RandUnsigned(8);
+			report "symbols per transfer = 0x" & ieee.numeric_std.to_hstring(rv0.RandUnsigned(axiMaster_out.tData'length));
+			/* synthesis translate_on */
+			
+			symbolsPerTransfer<=128x"8";
+		elsif rising_edge(irq_write) then
+			if axiMaster_out.tLast then
 				/* synthesis only. */
 				/* Testcase 1: number of symbols per transfer becomes 0 after first stream transfer. */
 				--symbolsPerTransfer<=(others=>'0');
@@ -244,16 +305,15 @@ begin
 				--uniform(seed0,seed1,rand0);
 				--symbolsPerTransfer<=120x"0" & to_unsigned(integer(rand0 * 2.0**8),8);	--symbolsPerTransfer'length
 				--report "symbols per transfer = " & ieee.numeric_std.to_hstring(to_unsigned(integer(rand0 * 2.0**8),8));	--axiMaster_out.tData'length));
-				symbolsPerTransfer<=128x"8";
-
 				
-				/* Truncate symbolsPerTransfer to 8 bits, so that it uses a "small" value for simulation. */
-				/* simulation only. */
+				
 				/* synthesis translate_off */
-				symbolsPerTransfer<=120x"0" & rv0.RandSigned(64);
+				symbolsPerTransfer<=120x"0" & rv0.RandUnsigned(8);
 				report "symbols per transfer = 0x" & ieee.numeric_std.to_hstring(rv0.RandUnsigned(axiMaster_out.tData'length));
 				/* synthesis translate_on */
+				
+				symbolsPerTransfer<=128x"8";
 			end if;
 		end if;
-	end process sequencer;
+	end process;
 end architecture rtl;

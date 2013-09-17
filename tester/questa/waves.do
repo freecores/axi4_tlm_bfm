@@ -8,7 +8,7 @@ add wave -position end  sim:/user/axiMaster/next_axiTxState
 
 add wave -divider "Tester"
 add wave -position end  sim:/user/clk
-add wave -position end  sim:/user/reset
+add wave -position end  sim:/user/nReset
 add wave -position end  sim:/user/irq_write
 add wave -position end -expand -hexadecimal sim:/user/axiMaster_in
 add wave -position end -expand -hexadecimal sim:/user/axiMaster_out

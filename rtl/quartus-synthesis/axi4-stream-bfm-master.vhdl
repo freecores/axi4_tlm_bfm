@@ -38,16 +38,13 @@
 library ieee; use ieee.std_logic_1164.all, ieee.numeric_std.all;
 --library tauhop; use tauhop.transactor.all, tauhop.axiTransactor.all;
 
-/* TODO remove once generic packages are supported. */
+--/* TODO remove once generic packages are supported. */
 library tauhop; use tauhop.tlm.all, tauhop.axiTLM.all;
 
 entity axiBfmMaster is --generic(constant maxTransactions:positive);
 	port(aclk,n_areset:in std_ulogic;
-		/* User trigger. */
-		trigger:in boolean;
-		
 		/* BFM signalling. */
-		readRequest,writeRequest:in t_bfm:=((others=>'X'),(others=>'X'),false);	-- this is tauhop.transactor.t_bfm.
+		readRequest,writeRequest:in t_bfm:=((others=>'X'),(others=>'X'),false);		-- this is tauhop.transactor.t_bfm.
 		readResponse,writeResponse:buffer t_bfm;									-- use buffer until synthesis tools support reading from out ports.
 		
 		/* AXI Master interface */
@@ -72,24 +69,21 @@ architecture rtl of axiBfmMaster is
 	/* Finite-state Machines. */
 	signal axiTxState,next_axiTxState:axiBfmStatesTx:=idle;
 	
-	/* General pipelines. */
-	signal i_axiMaster_out:t_axi4StreamTransactor_m2s;
-	
 	/* BFM signalling. */
 	signal i_readRequest:t_bfm:=((others=>'0'),(others=>'0'),false);
 	signal i_writeRequest:t_bfm:=((others=>'0'),(others=>'0'),false);
 	
-	signal response,i_response:boolean;
+	signal i_readResponse,i_writeResponse:t_bfm;
 	
 begin
 	/* Transaction counter. */
 	process(n_areset,symbolsPerTransfer,aclk) is begin
 		if not n_areset then outstandingTransactions<=symbolsPerTransfer;
-		elsif rising_edge(aclk) then
-			if outstandingTransactions>0 then outstandingTransactions<=outstandingTransactions-1;
-			else
+		elsif falling_edge(aclk) then
+			if outstandingTransactions<1 then
 				outstandingTransactions<=symbolsPerTransfer;
 				report "No more pending transactions." severity note;
+			elsif axiMaster_in.tReady then outstandingTransactions<=outstandingTransactions-1;
 			end if;
 		end if;
 	end process;
@@ -98,29 +92,45 @@ begin
 	axi_bfmTx_ns: process(all) is begin
 		axiTxState<=next_axiTxState;
 		
-		if not n_areset then axiTxState<=idle;
-		elsif writeRequest.trigger xor i_writeRequest.trigger then axiTxState<=payload;
-		end if;
+		if not n_areset then axiTxState<=idle; end if;
 		
 		case next_axiTxState is
-			when idle=>null;
+			when idle=>
+				if writeRequest.trigger xor i_writeRequest.trigger then axiTxState<=payload; end if;
 			when payload=>
-				if outstandingTransactions<1 then axiTxState<=idle; end if;
+				if outstandingTransactions<1 then axiTxState<=endOfTx; end if;
+			when endOfTx=>
+				axiTxState<=idle;
 			when others=>axiTxState<=idle;
 		end case;
 	end process axi_bfmTx_ns;
 	
 	/* output logic for AXI4-Stream Master Tx BFM. */
 	axi_bfmTx_op: process(all) is begin
-		axiMaster_out<=i_axiMaster_out;
+		i_writeResponse<=writeResponse;
+		
+		axiMaster_out.tValid<=false;
+		axiMaster_out.tLast<=false;
+		axiMaster_out.tData<=(others=>'Z');
+		i_writeResponse.trigger<=false;
 		
 		case next_axiTxState is
+			when idle=>
+				if writeRequest.trigger xor i_writeRequest.trigger then
+					axiMaster_out.tData<=writeRequest.message;
+					axiMaster_out.tValid<=true;
+				end if;
 			when payload=>
 				axiMaster_out.tValid<=true;
+				axiMaster_out.tData<=writeRequest.message;
+				
 				if axiMaster_in.tReady then
-					axiMaster_out.tData<=writeRequest.message;
+					i_writeResponse.trigger<=true;
 				end if;
-			when others=> axiMaster_out.tValid<=false; axiMaster_out.tData<=(others=>'Z');		--TODO: set 'Z' to '0' for synthesis.
+				
+				/* TODO change to a flag at user.vhdl. Move outstandingTransactions to user.vhdl. */
+				if outstandingTransactions<1 then axiMaster_out.tLast<=true; end if;
+			when others=> null;
 		end case;
 	end process axi_bfmTx_op;
 	
@@ -128,12 +138,15 @@ begin
 	/* state registers and pipelines for AXI4-Stream Tx BFM. */
 	process(n_areset,aclk) is begin
 		if not n_areset then next_axiTxState<=idle;
-		elsif rising_edge(aclk) then
+		elsif falling_edge(aclk) then
 			next_axiTxState<=axiTxState;
-			i_axiMaster_out<=axiMaster_out;
 			i_writeRequest<=writeRequest;
 		end if;
 	end process;
 	
---	dbg_axiTxFsm<=axiTxState;
+	process(aclk) is begin
+		if rising_edge(aclk) then
+			writeResponse<=i_writeResponse;
+		end if;
+	end process;
 end architecture rtl;

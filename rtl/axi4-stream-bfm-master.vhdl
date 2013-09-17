@@ -56,7 +56,7 @@ entity axiBfmMaster is --generic(constant maxTransactions:positive);
 --		axiSlave_out:buffer tAxi4Transactor_s2m;
 		
 		symbolsPerTransfer:in t_cnt;
-		outstandingTransactions:out t_cnt
+		outstandingTransactions:buffer t_cnt
 		
 		/* Debug ports. */
 --		dbg_cnt:out unsigned(9 downto 0);
