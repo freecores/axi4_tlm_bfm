@@ -36,7 +36,7 @@
 	from http://www.opencores.org/lgpl.shtml.
 */
 library ieee; use ieee.std_logic_1164.all, ieee.numeric_std.all;
-library tauhop; use tauhop.transactor.all, tauhop.axiTransactor.all;
+library tauhop; use tauhop.axiTransactor.all;
 
 --/* TODO remove once generic packages are supported. */
 --library tauhop; use tauhop.tlm.all, tauhop.axiTLM.all;
@@ -44,8 +44,10 @@ library tauhop; use tauhop.transactor.all, tauhop.axiTransactor.all;
 entity axiBfmMaster is --generic(constant maxTransactions:positive);
 	port(aclk,n_areset:in std_ulogic;
 		/* BFM signalling. */
-		readRequest,writeRequest:in t_bfm:=((others=>'X'),(others=>'X'),false);		-- this is tauhop.transactor.t_bfm.
-		readResponse,writeResponse:buffer t_bfm;									-- use buffer until synthesis tools support reading from out ports.
+		/* FIXME Generic package defect. ModelSim currently can't make tauhop.axiTransactor.i_transactor visible. */
+		readRequest,writeRequest:in i_transactor.t_bfm:=((others=>'X'),(others=>'X'),false);
+		--readRequest,writeRequest:in i_transactor.t_bfm:=((others=>'X'),(others=>'X'),false);
+		readResponse,writeResponse:buffer i_transactor.t_bfm;									-- use buffer until synthesis tools support reading from out ports.
 		
 		/* AXI Master interface */
 		axiMaster_in:in t_axi4StreamTransactor_s2m;
@@ -55,8 +57,8 @@ entity axiBfmMaster is --generic(constant maxTransactions:positive);
 --		axiSlave_in:in tAxi4Transactor_m2s;
 --		axiSlave_out:buffer tAxi4Transactor_s2m;
 		
-		symbolsPerTransfer:in t_cnt;
-		outstandingTransactions:buffer t_cnt
+		symbolsPerTransfer:in i_transactor.t_cnt;
+		outstandingTransactions:buffer i_transactor.t_cnt
 		
 		/* Debug ports. */
 --		dbg_cnt:out unsigned(9 downto 0);
@@ -70,10 +72,10 @@ architecture rtl of axiBfmMaster is
 	signal axiTxState,next_axiTxState:axiBfmStatesTx:=idle;
 	
 	/* BFM signalling. */
-	signal i_readRequest:t_bfm:=((others=>'0'),(others=>'0'),false);
-	signal i_writeRequest:t_bfm:=((others=>'0'),(others=>'0'),false);
+	signal i_readRequest:i_transactor.t_bfm:=((others=>'0'),(others=>'0'),false);
+	signal i_writeRequest:i_transactor.t_bfm:=((others=>'0'),(others=>'0'),false);
 	
-	signal i_readResponse,i_writeResponse:t_bfm;
+	signal i_readResponse,i_writeResponse:i_transactor.t_bfm;
 	
 begin
 	/* Transaction counter. */

@@ -50,6 +50,8 @@ package axiTLM is
 	
 	/* TODO remove once generic packages are supported. */
 	use tauhop.tlm.all;
+	--type boolean_vector is array(natural range<>) of boolean;
+	--subtype t_qualifier is boolean_vector(32/8-1 downto 0);
 	subtype t_qualifier is std_ulogic_vector(32/8-1 downto 0);
 	subtype t_id is unsigned(31 downto 0);
 	subtype t_dest is unsigned(3 downto 0);

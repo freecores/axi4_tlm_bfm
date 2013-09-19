@@ -59,20 +59,20 @@ package tlm is
 	end record t_bfm;
 	
 	procedure write(
-		signal request:inout t_bfm;		--FIXME use inout because Quartus doesn't yet allow reading of "out" within a procedure. VHDL-2008 allows this, and QuestaSim works fine.
+		signal request:out t_bfm;		--FIXME use inout because Quartus doesn't yet allow reading of "out" within a procedure. VHDL-2008 allows this, and QuestaSim works fine.
 		address:in t_addr;				-- used only for non-stream interfaces.
 		data:in t_msg
 	);
 	
 	procedure read(
-		signal request:inout t_bfm;		--FIXME use inout because Quartus doesn't yet allow reading of "out" within a procedure. VHDL-2008 allows this, and QuestaSim works fine.
+		signal request:out t_bfm;		--FIXME use inout because Quartus doesn't yet allow reading of "out" within a procedure. VHDL-2008 allows this, and QuestaSim works fine.
 		address:in t_addr				-- used only for non-stream interfaces.
 	);
 end package tlm;
 
 package body tlm is
 	procedure write(
-		signal request:inout t_bfm;		--FIXME use inout because Quartus doesn't yet allow reading of "out" within a procedure. VHDL-2008 allows this, and QuestaSim works fine.
+		signal request:out t_bfm;		--FIXME use inout because Quartus doesn't yet allow reading of "out" within a procedure. VHDL-2008 allows this, and QuestaSim works fine.
 		address:in t_addr;				-- used only for non-stream interfaces.
 		data:in t_msg
 	) is begin
@@ -82,7 +82,7 @@ package body tlm is
 	end procedure write;
 	
 	procedure read(
-		signal request:inout t_bfm;		--FIXME use inout because Quartus doesn't yet allow reading of "out" within a procedure. VHDL-2008 allows this, and QuestaSim works fine.
+		signal request:out t_bfm;		--FIXME use inout because Quartus doesn't yet allow reading of "out" within a procedure. VHDL-2008 allows this, and QuestaSim works fine.
 		address:in t_addr				-- used only for non-stream interfaces.
 	) is begin
 		request.address<=address;

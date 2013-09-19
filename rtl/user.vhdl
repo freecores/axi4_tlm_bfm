@@ -35,7 +35,7 @@
 	from http://www.opencores.org/lgpl.shtml.
 */
 library ieee; use ieee.std_logic_1164.all, ieee.numeric_std.all; use ieee.math_real.all;
-library tauhop; use tauhop.transactor.all, tauhop.axiTransactor.all;		--TODO just use axiTransactor here as transactor should already be wrapped up.
+library tauhop; use tauhop.axiTransactor.all;
 
 /* TODO remove once generic packages are supported. */
 --library tauhop; use tauhop.tlm.all, tauhop.axiTLM.all;
@@ -59,14 +59,14 @@ end entity user;
 architecture rtl of user is
 	/* Global counters. */
 	constant maxSymbols:positive:=2048;		--maximum number of symbols allowed to be transmitted in a frame. Each symbol's width equals tData's width. 
-	signal symbolsPerTransfer:t_cnt;
-	signal outstandingTransactions:t_cnt;
+	signal symbolsPerTransfer:i_transactor.t_cnt;
+	signal outstandingTransactions:i_transactor.t_cnt;
 	
 	/* BFM signalling. */
-	signal readRequest:t_bfm:=((others=>'0'),(others=>'0'),false);
-	signal writeRequest:t_bfm:=((others=>'0'),(others=>'0'),false);
-	signal readResponse:t_bfm;
-	signal writeResponse:t_bfm;
+	signal readRequest:i_transactor.t_bfm:=((others=>'0'),(others=>'0'),false);
+	signal writeRequest:i_transactor.t_bfm:=((others=>'0'),(others=>'0'),false);
+	signal readResponse:i_transactor.t_bfm;
+	signal writeResponse:i_transactor.t_bfm;
 	
 	type txStates is (idle,transmitting);
 	signal txFSM,i_txFSM:txStates;
@@ -166,12 +166,12 @@ begin
 	/* Data transmitter. */
 	sequencer: process(nReset,irq_write) is
 		/* Local procedures to map BFM signals with the package procedure. */
-		procedure read(address:in t_addr) is begin
-			read(readRequest,address);
+		procedure read(address:in i_transactor.t_addr) is begin
+			i_transactor.read(readRequest,address);
 		end procedure read;
 		
-		procedure write(data:in t_msg) is begin
-			write(request=>writeRequest, address=>(others=>'-'), data=>data);
+		procedure write(data:in i_transactor.t_msg) is begin
+			i_transactor.write(request=>writeRequest, address=>(others=>'-'), data=>data);
 		end procedure write;
 		
 		variable isPktError:boolean;
