@@ -78,17 +78,16 @@ architecture rtl of axiBfmMaster is
 begin
 	/* Transaction counter. */
 	process(n_areset,symbolsPerTransfer,aclk) is begin
-		/* Using synchronous reset will meet timing. However, because outstandingTransactions is a huge 
-			register set, using asynchronous reset will violate timing.
-			FIXME Try and close timing even with asynchronous reset applied on outstandingTransactions.
-				Using asynchronous reset will help to lower power.
-		*/
-		if not n_areset then outstandingTransactions<=symbolsPerTransfer;
-		elsif falling_edge(aclk) then
-			if outstandingTransactions<1 then
-				outstandingTransactions<=symbolsPerTransfer;
-				report "No more pending transactions." severity note;
-			elsif axiMaster_in.tReady then outstandingTransactions<=outstandingTransactions-1;
+		--if not n_areset then outstandingTransactions<=symbolsPerTransfer;
+		if falling_edge(aclk) then
+			/* Use synchronous reset for outstandingTransactions to meet timing because it is a huge register set. */
+			if not n_areset then outstandingTransactions<=symbolsPerTransfer;
+			else
+				if outstandingTransactions<1 then
+					outstandingTransactions<=symbolsPerTransfer;
+					report "No more pending transactions." severity note;
+				elsif axiMaster_in.tReady then outstandingTransactions<=outstandingTransactions-1;
+				end if;
 			end if;
 		end if;
 	end process;
@@ -125,19 +124,22 @@ begin
 			axiMaster_out.tValid<=true;
 		end if;
 		
-		case next_axiTxState is
-			when payload=>
-				axiMaster_out.tData<=writeRequest.message;
-				axiMaster_out.tValid<=true;
-				
-				if axiMaster_in.tReady then
-					i_writeResponse.trigger<=true;
-				end if;
-				
-				/* TODO change to a flag at user.vhdl. Move outstandingTransactions to user.vhdl. */
-				if outstandingTransactions<1 then axiMaster_out.tLast<=true; end if;
-			when others=> null;
-		end case;
+		if not n_areset then axiMaster_out.tData<=(others=>'Z');
+		else
+			case next_axiTxState is
+				when payload=>
+					axiMaster_out.tData<=writeRequest.message;
+					axiMaster_out.tValid<=true;
+					
+					if axiMaster_in.tReady then
+						i_writeResponse.trigger<=true;
+					end if;
+					
+					/* TODO change to a flag at user.vhdl. Move outstandingTransactions to user.vhdl. */
+					if outstandingTransactions<1 then axiMaster_out.tLast<=true; end if;
+				when others=> null;
+			end case;
+		end if;
 	end process axi_bfmTx_op;
 	
 	/* state registers and pipelines for AXI4-Stream Tx BFM. */

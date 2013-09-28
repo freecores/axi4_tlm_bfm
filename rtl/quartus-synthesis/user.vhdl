@@ -76,18 +76,16 @@ architecture rtl of user is
 	
 	/* Tester signals. */
 	/* synthesis translate_off */
-	signal clk,nReset:std_ulogic:='0';
+	signal clk,reset:std_ulogic:='0';
 	/* synthesis translate_on */
 	
+	signal cnt:unsigned(3 downto 0);
+	signal reset:std_ulogic:='0';
 	signal testerClk:std_ulogic;
 	--signal trigger:boolean;
 	signal dbg_axiTxFSM:axiBfmStatesTx;
 	signal anlysr_dataIn:std_logic_vector(127 downto 0);
 	signal anlysr_trigger:std_ulogic;
-	
-	/* Signal preservations for SignalTap II probing. */
-	--attribute keep:boolean;
-	--attribute keep of trigger:signal is true;
 	
 	signal axiMaster_in:t_axi4StreamTransactor_s2m;
 	signal irq_write:std_ulogic;		-- clock gating.
@@ -96,7 +94,7 @@ begin
 	/* Bus functional models. */
 	axiMaster: entity work.axiBfmMaster(rtl)
 		port map(
-			aclk=>irq_write, n_areset=>nReset,
+			aclk=>irq_write, n_areset=>not reset,
 			
 			readRequest=>readRequest,	writeRequest=>writeRequest,
 			readResponse=>readResponse,	writeResponse=>writeResponse,
@@ -109,12 +107,12 @@ begin
 	);
 	
 	/* Interrupt-request generator. */
-	irq_write<=clk when nReset else '0';
+	irq_write<=clk when not reset else '0';
 	
 	/* Simulation Tester. */
 	/* PLL to generate tester's clock. */
 	f100MHz: entity altera.pll(syn) port map(
-		areset=>not nReset,
+		areset=>'0',	--not reset,		--not nReset,
 		inclk0=>clk,
 		c0=>testerClk,
 		locked=>open
@@ -132,23 +130,20 @@ begin
 	
 	
 	/* Hardware tester. */
-	/*
-	por: process(reset,clk) is
-		variable cnt:unsigned(7 downto 0):=x"ff";
+	por: process(nReset,clk) is
+		--variable cnt:unsigned(7 downto 0):=(others=>'1');
 	begin
-		if not reset then cnt<=(others=>'1');
+		if not nReset then cnt<=(others=>'1');
 		elsif rising_edge(clk) then
-			nReset<='1';
+			reset<='0';
 			
-			if cnt>x"8" then nReset<='0'; end if;
-			
-			if cnt>0 then cnt:=cnt-1; end if;
+			if cnt>0 then reset<='1'; cnt<=cnt-1; end if;
 		end if;
 	end process por;
-	*/
 	
 	/* SignalTap II embedded logic analyser. Included as part of BiST architecture. */
 	anlysr_trigger<='1' when writeRequest.trigger else '0';
+	--anlysr_trigger<='1' when reset else '0';
 	
 	/* Disable this for synthesis as this is not currently synthesisable.
 		Pull the framerFSM statemachine signal from lower down the hierarchy to this level instead.
@@ -162,7 +157,7 @@ begin
 	--anlysr_dataIn(2 downto 0) <= <<signal axiMaster.axiTxState:axiBfmStatesTx>>;
 	anlysr_dataIn(17 downto 16)<=to_std_logic_vector(dbg_axiTxFSM);
 	anlysr_dataIn(18)<='1' when clk else '0';
-	anlysr_dataIn(19)<='1' when nReset else '0';
+	anlysr_dataIn(19)<='1' when reset else '0';
 	anlysr_dataIn(20)<='1' when irq_write else '0';
 	anlysr_dataIn(21)<='1' when axiMaster_in.tReady else '0';
 	anlysr_dataIn(22)<='1' when axiMaster_out.tValid else '0';
@@ -173,6 +168,7 @@ begin
 	anlysr_dataIn(96)<='1' when writeRequest.trigger else '0';
 	anlysr_dataIn(97)<='1' when writeResponse.trigger else '0';
 	--anlysr_dataIn(99 downto 98)<=to_std_logic_vector(txFSM);
+	anlysr_dataIn(101 downto 98)<=std_logic_vector(cnt);
 	
 	anlysr_dataIn(anlysr_dataIn'high downto 106)<=(others=>'0');
 	
@@ -251,7 +247,7 @@ begin
 	/* Data transmitter. */
 	sequencer_ns: process(all) is begin
 		txFSM<=i_txFSM;
-		if not nReset then txFSM<=idle;
+		if reset then txFSM<=idle;
 		else
 			case i_txFSM is
 				when idle=>
@@ -266,7 +262,7 @@ begin
 	end process sequencer_ns;
 	
 	/* Data transmitter. */
-	sequencer_op: process(nReset,irq_write) is
+	sequencer_op: process(reset,irq_write) is
 		/* Local procedures to map BFM signals with the package procedure. */
 		procedure read(address:in t_addr) is begin
 			read(readRequest,address);
@@ -287,7 +283,7 @@ begin
 		/* synthesis translate_on */
 		
 	begin
-		if not nReset then
+		if reset then
 			/* synthesis only. */
 			rand0:=(others=>'0');
 			
@@ -320,12 +316,12 @@ begin
 	
 	
 	/* Reset symbolsPerTransfer to new value (prepare for new transfer) after current transfer has been completed. */
-	process(nReset,irq_write) is
+	process(reset,irq_write) is
 		/* synthesis translate_off */
 		variable rv0:RandomPType;
 		/* synthesis translate_on */
 	begin
-		if not nReset then
+		if reset then
 			/* synthesis translate_off */
 			rv0.InitSeed(rv0'instance_name);
 			symbolsPerTransfer<=120x"0" & rv0.RandUnsigned(8);

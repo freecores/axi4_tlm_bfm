@@ -63,8 +63,7 @@ set_global_assignment -name VHDL_FILE "../../rtl/quartus-synthesis/axi4-stream-b
 set_global_assignment -name VHDL_FILE "../../rtl/quartus-synthesis/user.vhdl"
 set_global_assignment -name VHDL_FILE "../../rtl/quartus-synthesis/stp.vhd"
 set_global_assignment -name VHDL_FILE "../../rtl/quartus-synthesis/pll.vhd"
-#set_location_assignment PIN_N2 -to nReset
-set_location_assignment PIN_F1 -to reset
+set_location_assignment PIN_N2 -to nReset
 set_location_assignment PIN_V9 -to clk
 
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

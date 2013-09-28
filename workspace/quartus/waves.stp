@@ -501,7 +501,7 @@
           <wire alias="stp:i_bistFramer_stp_analyser|acq_data_in[16]" name="acq_data_in[16]" tap_mode="classic" type="unknown"/>
           <wire alias="stp:i_bistFramer_stp_analyser|acq_data_in[17]" name="acq_data_in[17]" tap_mode="classic" type="unknown"/>
           <wire alias="clk" name="acq_data_in[18]" tap_mode="classic" type="unknown"/>
-          <wire alias="nReset" name="acq_data_in[19]" tap_mode="classic" type="unknown"/>
+          <wire alias="reset" name="acq_data_in[19]" tap_mode="classic" type="unknown"/>
           <wire alias="irq_write" name="acq_data_in[20]" tap_mode="classic" type="unknown"/>
           <wire alias="axiMaster_in.tReady" name="acq_data_in[21]" tap_mode="classic" type="unknown"/>
           <wire alias="axiMaster_out.tValid" name="acq_data_in[22]" tap_mode="classic" type="unknown"/>
@@ -904,7 +904,7 @@
           <net is_signal_inverted="no" name="acq_trigger_in[0]"/>
         </setup_view>
       </presentation>
-      <trigger CRC="A1D452D4" attribute_mem_mode="false" gap_record="true" global_temp="1" is_expanded="true" name="trigger: 2013/09/25 02:14:11  #1" position="pre" power_up_trigger_mode="false" record_data_gap="true" segment_size="1" storage_mode="off" storage_qualifier_disabled="no" storage_qualifier_port_is_pin="true" storage_qualifier_port_name="auto_stp_external_storage_qualifier" storage_qualifier_port_tap_mode="classic" trigger_in="either edge" trigger_out="active high" trigger_type="circular">
+      <trigger CRC="A1D452D4" attribute_mem_mode="false" gap_record="true" global_temp="1" is_expanded="true" name="trigger: 2013/09/25 02:14:11  #1" position="pre" power_up_trigger_mode="false" record_data_gap="true" segment_size="1" storage_mode="off" storage_qualifier_disabled="no" storage_qualifier_port_is_pin="true" storage_qualifier_port_name="auto_stp_external_storage_qualifier" storage_qualifier_port_tap_mode="classic" trigger_in="rising edge" trigger_out="active high" trigger_type="circular">
         <power_up_trigger position="pre" storage_qualifier_disabled="no" trigger_in="dont_care" trigger_out="active high"/>
         <events use_custom_flow_control="no">
           <level enabled="yes" name="condition1" type="basic">
@@ -977,7 +977,7 @@
     <single attribute="hierarchy widget visible" value="1"/>
     <single attribute="instance widget visible" value="1"/>
     <single attribute="jtag widget visible" value="1"/>
-    <multi attribute="column width" size="23" value="34,150,140,74,68,70,88,88,98,98,88,88,110,101,101,101,101,101,101,101,101,107,78"/>
+    <multi attribute="column width" size="23" value="34,154,108,74,68,70,88,88,98,98,88,88,110,101,101,101,101,101,101,101,101,107,78"/>
     <multi attribute="frame size" size="2" value="1600,1178"/>
     <multi attribute="jtag widget size" size="2" value="398,145"/>
   </global_info>
