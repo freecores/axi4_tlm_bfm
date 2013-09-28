@@ -78,7 +78,10 @@ architecture rtl of user is
 	/* synthesis translate_off */
 	signal clk,nReset:std_ulogic:='0';
 	/* synthesis translate_on */
+	
+	signal testerClk:std_ulogic;
 	--signal trigger:boolean;
+	signal dbg_axiTxFSM:axiBfmStatesTx;
 	signal anlysr_dataIn:std_logic_vector(127 downto 0);
 	signal anlysr_trigger:std_ulogic;
 	
@@ -101,13 +104,22 @@ begin
 			axiMaster_out=>axiMaster_out,
 			
 			symbolsPerTransfer=>symbolsPerTransfer,
-			outstandingTransactions=>outstandingTransactions
+			outstandingTransactions=>outstandingTransactions,
+			dbg_axiTxFSM=>dbg_axiTxFSM
 	);
 	
 	/* Interrupt-request generator. */
 	irq_write<=clk when nReset else '0';
 	
 	/* Simulation Tester. */
+	/* PLL to generate tester's clock. */
+	f100MHz: entity altera.pll(syn) port map(
+		areset=>not nReset,
+		inclk0=>clk,
+		c0=>testerClk,
+		locked=>open
+	);
+	
 	/* synthesis translate_off */
 	clk<=not clk after 10 ps;
 	process is begin
@@ -118,24 +130,24 @@ begin
 	end process;
 	/* synthesis translate_on */
 	
+	
 	/* Hardware tester. */
-	/* directly instantiated if configurations is not used.
-		component-instantiated if configurations are used.
-	*/
---	i_bist: entity work.framer_bist(tc1)
-	/*i_bist: entity work.framer_bist(tc2_randomised)
-		generic map(interPktGap=>3, pktSize=>pktSize)
-		port map(nReset=>nReset, clk=>clk,
-			trigger=>trigger,
-			txDataIn=>txDataIn,
-			txOut=>data(0),
-			dataFault=>dataFault, crcFault=>crcFault
-	);
+	/*
+	por: process(reset,clk) is
+		variable cnt:unsigned(7 downto 0):=x"ff";
+	begin
+		if not reset then cnt<=(others=>'1');
+		elsif rising_edge(clk) then
+			nReset<='1';
+			
+			if cnt>x"8" then nReset<='0'; end if;
+			
+			if cnt>0 then cnt:=cnt-1; end if;
+		end if;
+	end process por;
 	*/
 	
 	/* SignalTap II embedded logic analyser. Included as part of BiST architecture. */
-	--trigger<=clk='1';
-	--anlysr_trigger<='1' when trigger else '0';
 	anlysr_trigger<='1' when writeRequest.trigger else '0';
 	
 	/* Disable this for synthesis as this is not currently synthesisable.
@@ -145,23 +157,29 @@ begin
 	--framerFSM<=to_unsigned(<<signal framers_txs(0).i_framer.framerFSM: framerFsmStates>>,framerFSM'length);
 	/* synthesis translate_on */
 	
-	anlysr_dataIn(0)<='1' when nReset else '0';
-	anlysr_dataIn(1)<='1' when irq_write else '0';
-	anlysr_dataIn(2)<='1' when axiMaster_in.tReady else '0';
-	anlysr_dataIn(3)<='1' when axiMaster_out.tValid else '0';
-	anlysr_dataIn(67 downto 4)<=std_logic_vector(axiMaster_out.tData);
-	anlysr_dataIn(71 downto 68)<=std_logic_vector(axiMaster_out.tStrb);
-	anlysr_dataIn(75 downto 72)<=std_logic_vector(axiMaster_out.tKeep);
-	anlysr_dataIn(76)<='1' when axiMaster_out.tLast else '0';
-	--anlysr_dataIn(2)<='1' when axiMaster_out.tValid else '0';
-	anlysr_dataIn(77)<='1' when writeRequest.trigger else '0';
+	anlysr_dataIn(7 downto 0)<=std_logic_vector(symbolsPerTransfer(7 downto 0));
+	anlysr_dataIn(15 downto 8)<=std_logic_vector(outstandingTransactions(7 downto 0));
+	--anlysr_dataIn(2 downto 0) <= <<signal axiMaster.axiTxState:axiBfmStatesTx>>;
+	anlysr_dataIn(17 downto 16)<=to_std_logic_vector(dbg_axiTxFSM);
+	anlysr_dataIn(18)<='1' when clk else '0';
+	anlysr_dataIn(19)<='1' when nReset else '0';
+	anlysr_dataIn(20)<='1' when irq_write else '0';
+	anlysr_dataIn(21)<='1' when axiMaster_in.tReady else '0';
+	anlysr_dataIn(22)<='1' when axiMaster_out.tValid else '0';
+	anlysr_dataIn(86 downto 23)<=std_logic_vector(axiMaster_out.tData);
+	anlysr_dataIn(90 downto 87)<=std_logic_vector(axiMaster_out.tStrb);
+	anlysr_dataIn(94 downto 91)<=std_logic_vector(axiMaster_out.tKeep);
+	anlysr_dataIn(95)<='1' when axiMaster_out.tLast else '0';
+	anlysr_dataIn(96)<='1' when writeRequest.trigger else '0';
+	anlysr_dataIn(97)<='1' when writeResponse.trigger else '0';
+	--anlysr_dataIn(99 downto 98)<=to_std_logic_vector(txFSM);
 	
-	anlysr_dataIn(anlysr_dataIn'high downto 78)<=(others=>'0');
+	anlysr_dataIn(anlysr_dataIn'high downto 106)<=(others=>'0');
 	
 	
 	/* Simulate only if you have compiled Altera's simulation libraries. */
 	i_bistFramer_stp_analyser: entity altera.stp(syn) port map(
-		acq_clk=>clk,
+		acq_clk=>testerClk,
 		acq_data_in=>anlysr_dataIn,
 		acq_trigger_in=>"1",
 		trigger_in=>anlysr_trigger
@@ -219,10 +237,36 @@ begin
 	/* synthesis translate_on */
 	
 	/* Synthesisable stimuli sequencer. */
-	axiMaster_in.tReady<=true when axiMaster_out.tValid and falling_edge(clk);
+	process(clk) is begin
+		if falling_edge(clk) then
+			axiMaster_in.tReady<=false;
+			--if axiMaster_out.tValid and not axiMaster_out.tLast then
+			if not axiMaster_in.tReady and axiMaster_out.tValid and not axiMaster_out.tLast then
+				axiMaster_in.tReady<=true;
+			end if;
+		end if;
+	end process;
+	
 	
 	/* Data transmitter. */
-	sequencer: process(nReset,irq_write) is
+	sequencer_ns: process(all) is begin
+		txFSM<=i_txFSM;
+		if not nReset then txFSM<=idle;
+		else
+			case i_txFSM is
+				when idle=>
+					if outstandingTransactions>0 then txFSM<=transmitting; end if;
+				when transmitting=>
+					if axiMaster_out.tLast then
+						txFSM<=idle;
+					end if;
+				when others=> null;
+			end case;
+		end if;
+	end process sequencer_ns;
+	
+	/* Data transmitter. */
+	sequencer_op: process(nReset,irq_write) is
 		/* Local procedures to map BFM signals with the package procedure. */
 		procedure read(address:in t_addr) is begin
 			read(readRequest,address);
@@ -252,34 +296,28 @@ begin
 			rv0.InitSeed(rv0'instance_name);
 			/* synthesis translate_on */
 			
-			txFSM<=idle;
+			--txFSM<=idle;
 		elsif falling_edge(irq_write) then
 			case txFSM is
-				when idle=>
-					if outstandingTransactions>0 then
-						/* synthesis translate_off */
-						write(rv0.RandSigned(axiMaster_out.tData'length));
-						/* synthesis translate_on */
-						write(rand0);
-						
-						txFSM<=transmitting;
-					end if;
 				when transmitting=>
-					if writeResponse.trigger then
+					if txFSM/=i_txFSM or writeResponse.trigger then
 						/* synthesis translate_off */
 						write(rv0.RandSigned(axiMaster_out.tData'length));
 						/* synthesis translate_on */
 						write(rand0);
 						rand0:=rand0+1;
 					end if;
-					
-					if axiMaster_out.tLast then
-						txFSM<=idle;
-					end if;
 				when others=>null;
 			end case;
 		end if;
-	end process sequencer;
+	end process sequencer_op;
+	
+	sequencer_regs: process(irq_write) is begin
+		if falling_edge(irq_write) then
+			i_txFSM<=txFSM;
+		end if;
+	end process sequencer_regs;
+	
 	
 	/* Reset symbolsPerTransfer to new value (prepare for new transfer) after current transfer has been completed. */
 	process(nReset,irq_write) is
@@ -312,7 +350,7 @@ begin
 				report "symbols per transfer = 0x" & ieee.numeric_std.to_hstring(rv0.RandUnsigned(axiMaster_out.tData'length));
 				/* synthesis translate_on */
 				
-				symbolsPerTransfer<=128x"8";
+				symbolsPerTransfer<=128x"0f";		--128x"ffffffff_ffffffff_ffffffff_ffffffff";
 			end if;
 		end if;
 	end process;

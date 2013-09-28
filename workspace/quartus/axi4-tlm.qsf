@@ -54,14 +54,17 @@ set_global_assignment -name EDA_SIMULATION_TOOL "ModelSim-Altera (VHDL)"
 set_global_assignment -name EDA_OUTPUT_DATA_FORMAT VHDL -section_id eda_simulation
 set_global_assignment -name VHDL_INPUT_VERSION VHDL_2008
 set_global_assignment -name VHDL_SHOW_LMF_MAPPING_MESSAGES OFF
-set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
+set_global_assignment -name PARTITION_NETLIST_TYPE POST_FIT -section_id Top
 set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
 set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
 set_global_assignment -name VHDL_FILE "../../rtl/quartus-synthesis/pkg-tlm.vhdl"
 set_global_assignment -name VHDL_FILE "../../rtl/quartus-synthesis/pkg-axi-tlm.vhdl"
 set_global_assignment -name VHDL_FILE "../../rtl/quartus-synthesis/axi4-stream-bfm-master.vhdl"
-set_global_assignment -name VHDL_FILE ../../rtl/quartus-synthesis/user.vhdl
-set_global_assignment -name VHDL_FILE ../../rtl/quartus-synthesis/stp.vhd
-set_location_assignment PIN_N2 -to nReset
+set_global_assignment -name VHDL_FILE "../../rtl/quartus-synthesis/user.vhdl"
+set_global_assignment -name VHDL_FILE "../../rtl/quartus-synthesis/stp.vhd"
+set_global_assignment -name VHDL_FILE "../../rtl/quartus-synthesis/pll.vhd"
+#set_location_assignment PIN_N2 -to nReset
+set_location_assignment PIN_F1 -to reset
 set_location_assignment PIN_V9 -to clk
+
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

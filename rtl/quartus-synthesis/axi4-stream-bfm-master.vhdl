@@ -36,15 +36,15 @@
 	from http://www.opencores.org/lgpl.shtml.
 */
 library ieee; use ieee.std_logic_1164.all, ieee.numeric_std.all;
---library tauhop; use tauhop.transactor.all, tauhop.axiTransactor.all;
+--library tauhop; use tauhop.axiTransactor.all;
 
 --/* TODO remove once generic packages are supported. */
 library tauhop; use tauhop.tlm.all, tauhop.axiTLM.all;
 
-entity axiBfmMaster is --generic(constant maxTransactions:positive);
+entity axiBfmMaster is
 	port(aclk,n_areset:in std_ulogic;
 		/* BFM signalling. */
-		readRequest,writeRequest:in t_bfm:=((others=>'X'),(others=>'X'),false);		-- this is tauhop.transactor.t_bfm.
+		readRequest,writeRequest:in t_bfm:=((others=>'X'),(others=>'X'),false);
 		readResponse,writeResponse:buffer t_bfm;									-- use buffer until synthesis tools support reading from out ports.
 		
 		/* AXI Master interface */
@@ -56,12 +56,12 @@ entity axiBfmMaster is --generic(constant maxTransactions:positive);
 --		axiSlave_out:buffer tAxi4Transactor_s2m;
 		
 		symbolsPerTransfer:in t_cnt;
-		outstandingTransactions:buffer t_cnt
+		outstandingTransactions:buffer t_cnt;
 		
 		/* Debug ports. */
 --		dbg_cnt:out unsigned(9 downto 0);
 --		dbg_axiRxFsm:out axiBfmStatesRx:=idle;
---		dbg_axiTxFsm:out axiBfmStatesTx:=idle
+		dbg_axiTxFsm:out axiBfmStatesTx:=idle
 	);
 end entity axiBfmMaster;
 
@@ -78,6 +78,11 @@ architecture rtl of axiBfmMaster is
 begin
 	/* Transaction counter. */
 	process(n_areset,symbolsPerTransfer,aclk) is begin
+		/* Using synchronous reset will meet timing. However, because outstandingTransactions is a huge 
+			register set, using asynchronous reset will violate timing.
+			FIXME Try and close timing even with asynchronous reset applied on outstandingTransactions.
+				Using asynchronous reset will help to lower power.
+		*/
 		if not n_areset then outstandingTransactions<=symbolsPerTransfer;
 		elsif falling_edge(aclk) then
 			if outstandingTransactions<1 then
@@ -92,17 +97,18 @@ begin
 	axi_bfmTx_ns: process(all) is begin
 		axiTxState<=next_axiTxState;
 		
-		if not n_areset then axiTxState<=idle; end if;
-		
-		case next_axiTxState is
-			when idle=>
-				if writeRequest.trigger xor i_writeRequest.trigger then axiTxState<=payload; end if;
-			when payload=>
-				if outstandingTransactions<1 then axiTxState<=endOfTx; end if;
-			when endOfTx=>
-				axiTxState<=idle;
-			when others=>axiTxState<=idle;
-		end case;
+		if not n_areset then axiTxState<=idle;
+		else
+			case next_axiTxState is
+				when idle=>
+					if writeRequest.trigger xor i_writeRequest.trigger then axiTxState<=payload; end if;
+				when payload=>
+					if outstandingTransactions<1 then axiTxState<=endOfTx; end if;
+				when endOfTx=>
+					axiTxState<=idle;
+				when others=>axiTxState<=idle;
+			end case;
+		end if;
 	end process axi_bfmTx_ns;
 	
 	/* output logic for AXI4-Stream Master Tx BFM. */
@@ -114,15 +120,15 @@ begin
 		axiMaster_out.tData<=(others=>'Z');
 		i_writeResponse.trigger<=false;
 		
+		if writeRequest.trigger xor i_writeRequest.trigger then
+			axiMaster_out.tData<=writeRequest.message;
+			axiMaster_out.tValid<=true;
+		end if;
+		
 		case next_axiTxState is
-			when idle=>
-				if writeRequest.trigger xor i_writeRequest.trigger then
-					axiMaster_out.tData<=writeRequest.message;
-					axiMaster_out.tValid<=true;
-				end if;
 			when payload=>
-				axiMaster_out.tValid<=true;
 				axiMaster_out.tData<=writeRequest.message;
+				axiMaster_out.tValid<=true;
 				
 				if axiMaster_in.tReady then
 					i_writeResponse.trigger<=true;
@@ -134,11 +140,9 @@ begin
 		end case;
 	end process axi_bfmTx_op;
 	
-	
 	/* state registers and pipelines for AXI4-Stream Tx BFM. */
 	process(n_areset,aclk) is begin
-		if not n_areset then next_axiTxState<=idle;
-		elsif falling_edge(aclk) then
+		if falling_edge(aclk) then
 			next_axiTxState<=axiTxState;
 			i_writeRequest<=writeRequest;
 		end if;
@@ -149,4 +153,6 @@ begin
 			writeResponse<=i_writeResponse;
 		end if;
 	end process;
+	
+	dbg_axiTxFSM<=axiTxState;
 end architecture rtl;

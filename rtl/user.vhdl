@@ -164,7 +164,23 @@ begin
 	
 	
 	/* Data transmitter. */
-	sequencer: process(nReset,irq_write) is
+	sequencer_ns: process(all) is begin
+		txFSM<=i_txFSM;
+		if not nReset then txFSM<=idle;
+		else
+			case i_txFSM is
+				when idle=>
+					if outstandingTransactions>0 then txFSM<=transmitting; end if;
+				when transmitting=>
+					if axiMaster_out.tLast then
+						txFSM<=idle;
+					end if;
+				when others=> null;
+			end case;
+		end if;
+	end process sequencer_ns;
+	
+	sequencer_op: process(nReset,irq_write) is
 		/* Local procedures to map BFM signals with the package procedure. */
 		procedure read(address:in i_transactor.t_addr) is begin
 			i_transactor.read(readRequest,address);
@@ -190,31 +206,24 @@ begin
 			/* synthesis translate_off */
 			rv0.InitSeed(rv0'instance_name);
 			/* synthesis translate_on */
-			
-			txFSM<=idle;
 		elsif falling_edge(irq_write) then
 			case txFSM is
-				when idle=>
-					if outstandingTransactions>0 then
-						/* synthesis translate_off */
-						write(rv0.RandSigned(axiMaster_out.tData'length));
-						/* synthesis translate_on */
-						txFSM<=transmitting;
-					end if;
 				when transmitting=>
-					if writeResponse.trigger then
+					if txFSM/=i_txFSM or writeResponse.trigger then
 						/* synthesis translate_off */
 						write(rv0.RandSigned(axiMaster_out.tData'length));
 						/* synthesis translate_on */
-					end if;
-					
-					if axiMaster_out.tLast then
-						txFSM<=idle;
 					end if;
 				when others=>null;
 			end case;
 		end if;
-	end process sequencer;
+	end process sequencer_op;
+	
+	sequencer_regs: process(irq_write) is begin
+		if falling_edge(irq_write) then
+			i_txFSM<=txFSM;
+		end if;
+	end process sequencer_regs;
 	
 	/* Reset symbolsPerTransfer to new value (prepare for new transfer) after current transfer has been completed. */
 	process(nReset,irq_write) is

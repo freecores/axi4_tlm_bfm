@@ -2,8 +2,10 @@
 #
 #	Example bash script for Mentor Graphics QuestaSim/ModelSim simulation.
 #	
-# Author: Daniel C.K. Kho <daniel.kho@tauhop.com>
-# Copyright© 2012-2013 Daniel C.K. Kho <daniel.kho@tauhop.com>
+#	Author(s): 
+#	- Daniel C.K. Kho, daniel.kho@opencores.org | daniel.kho@tauhop.com
+#	
+#	Copyright (C) 2012-2013 Authors and OPENCORES.ORG
 # 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -40,7 +42,8 @@ vlib tauhop; vmap tauhop tauhop;
 vcom -2008 -work osvvm ../../rtl/packages/os-vvm/SortListPkg_int.vhd \
 	../../rtl/packages/os-vvm/RandomBasePkg.vhd \
 	../../rtl/packages/os-vvm/RandomPkg.vhd \
-	../../rtl/packages/os-vvm/CoveragePkg.vhd;
+	../../rtl/packages/os-vvm/CoveragePkg.vhd \
+	| tee -ai ./simulate.log;
 
 vcom -2008 -work tauhop ../../rtl/packages/pkg-tlm.vhdl \
 	../../rtl/packages/pkg-axi-tlm.vhdl \

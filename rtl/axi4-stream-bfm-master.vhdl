@@ -71,6 +71,8 @@ architecture rtl of axiBfmMaster is
 	/* Finite-state Machines. */
 	signal axiTxState,next_axiTxState:axiBfmStatesTx:=idle;
 	
+	signal i_axiMaster_out:t_axi4StreamTransactor_m2s;
+	
 	/* BFM signalling. */
 	signal i_readRequest:i_transactor.t_bfm:=((others=>'0'),(others=>'0'),false);
 	signal i_writeRequest:i_transactor.t_bfm:=((others=>'0'),(others=>'0'),false);
@@ -88,61 +90,84 @@ begin
 			elsif axiMaster_in.tReady then outstandingTransactions<=outstandingTransactions-1;
 			end if;
 		end if;
+		
+		/* debug only. */
+		/*if falling_edge(aclk) then
+			if not n_areset then outstandingTransactions<=symbolsPerTransfer;
+			else
+				if outstandingTransactions<1 then
+					outstandingTransactions<=symbolsPerTransfer;
+					report "No more pending transactions." severity note;
+				elsif axiMaster_in.tReady then outstandingTransactions<=outstandingTransactions-1;
+				end if;
+			end if;
+		end if;
+		*/
 	end process;
 	
 	/* next-state logic for AXI4-Stream Master Tx BFM. */
 	axi_bfmTx_ns: process(all) is begin
 		axiTxState<=next_axiTxState;
 		
-		if not n_areset then axiTxState<=idle; end if;
-		
-		case next_axiTxState is
-			when idle=>
-				if writeRequest.trigger xor i_writeRequest.trigger then axiTxState<=payload; end if;
-			when payload=>
-				if outstandingTransactions<1 then axiTxState<=endOfTx; end if;
-			when endOfTx=>
-				axiTxState<=idle;
-			when others=>axiTxState<=idle;
-		end case;
+		if not n_areset then axiTxState<=idle;
+		else
+			case next_axiTxState is
+				when idle=>
+					if writeRequest.trigger xor i_writeRequest.trigger then axiTxState<=payload; end if;
+				when payload=>
+					if outstandingTransactions<1 then axiTxState<=endOfTx; end if;
+				when endOfTx=>
+					axiTxState<=idle;
+				when others=>axiTxState<=idle;
+			end case;
+		end if;
 	end process axi_bfmTx_ns;
 	
 	/* output logic for AXI4-Stream Master Tx BFM. */
 	axi_bfmTx_op: process(all) is begin
 		i_writeResponse<=writeResponse;
 		
-		axiMaster_out.tValid<=false;
-		axiMaster_out.tLast<=false;
-		axiMaster_out.tData<=(others=>'Z');
+		i_axiMaster_out.tValid<=false;
+		i_axiMaster_out.tLast<=false;
+		i_axiMaster_out.tData<=(others=>'Z');
 		i_writeResponse.trigger<=false;
+		
+		if writeRequest.trigger xor i_writeRequest.trigger then
+			i_axiMaster_out.tData<=writeRequest.message;
+			i_axiMaster_out.tValid<=true;
+		end if;
 		
 		case next_axiTxState is
 			when idle=>
-				if writeRequest.trigger xor i_writeRequest.trigger then
-					axiMaster_out.tData<=writeRequest.message;
-					axiMaster_out.tValid<=true;
+			/*	if writeRequest.trigger xor i_writeRequest.trigger then
+					i_axiMaster_out.tData<=writeRequest.message;
+					i_axiMaster_out.tValid<=true;
 				end if;
+			*/
+				null;
 			when payload=>
-				axiMaster_out.tValid<=true;
-				axiMaster_out.tData<=writeRequest.message;
+				i_axiMaster_out.tData<=writeRequest.message;
+				i_axiMaster_out.tValid<=true;
 				
 				if axiMaster_in.tReady then
 					i_writeResponse.trigger<=true;
 				end if;
 				
 				/* TODO change to a flag at user.vhdl. Move outstandingTransactions to user.vhdl. */
-				if outstandingTransactions<1 then axiMaster_out.tLast<=true; end if;
+				if outstandingTransactions<1 then i_axiMaster_out.tLast<=true; end if;
 			when others=> null;
 		end case;
 	end process axi_bfmTx_op;
 	
+	axiMaster_out<=i_axiMaster_out;
 	
 	/* state registers and pipelines for AXI4-Stream Tx BFM. */
 	process(n_areset,aclk) is begin
-		if not n_areset then next_axiTxState<=idle;
-		elsif falling_edge(aclk) then
+		--if not n_areset then next_axiTxState<=idle;
+		if falling_edge(aclk) then
 			next_axiTxState<=axiTxState;
 			i_writeRequest<=writeRequest;
+			--axiMaster_out<=i_axiMaster_out;
 		end if;
 	end process;
 	
