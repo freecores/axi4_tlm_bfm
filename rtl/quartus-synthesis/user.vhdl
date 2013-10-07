@@ -92,7 +92,7 @@ architecture rtl of user is
 	
 begin
 	/* Bus functional models. */
-	axiMaster: entity work.axiBfmMaster(rtl)
+	axiMaster: entity tauhop.axiBfmMaster(rtl)
 		port map(
 			aclk=>irq_write, n_areset=>not reset,
 			
@@ -112,7 +112,7 @@ begin
 	/* Simulation Tester. */
 	/* PLL to generate tester's clock. */
 	f100MHz: entity altera.pll(syn) port map(
-		areset=>'0',	--not reset,		--not nReset,
+		areset=>'0',	--not nReset,
 		inclk0=>clk,
 		c0=>testerClk,
 		locked=>open
@@ -142,8 +142,8 @@ begin
 	end process por;
 	
 	/* SignalTap II embedded logic analyser. Included as part of BiST architecture. */
-	anlysr_trigger<='1' when writeRequest.trigger else '0';
-	--anlysr_trigger<='1' when reset else '0';
+	--anlysr_trigger<='1' when writeRequest.trigger else '0';
+	anlysr_trigger<='1' when reset else '0';
 	
 	/* Disable this for synthesis as this is not currently synthesisable.
 		Pull the framerFSM statemachine signal from lower down the hierarchy to this level instead.
@@ -174,7 +174,7 @@ begin
 	
 	
 	/* Simulate only if you have compiled Altera's simulation libraries. */
-	i_bistFramer_stp_analyser: entity altera.stp(syn) port map(
+	i_bist_logicAnalyser: entity altera.stp(syn) port map(
 		acq_clk=>testerClk,
 		acq_data_in=>anlysr_dataIn,
 		acq_trigger_in=>"1",

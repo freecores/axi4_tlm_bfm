@@ -63,10 +63,8 @@ architecture rtl of user is
 	signal outstandingTransactions:i_transactor.t_cnt;
 	
 	/* BFM signalling. */
-	signal readRequest:i_transactor.t_bfm:=((others=>'0'),(others=>'0'),false);
-	signal writeRequest:i_transactor.t_bfm:=((others=>'0'),(others=>'0'),false);
-	signal readResponse:i_transactor.t_bfm;
-	signal writeResponse:i_transactor.t_bfm;
+	signal readRequest,writeRequest:i_transactor.t_bfm:=(address=>(others=>'X'),message=>(others=>'X'),trigger=>false);
+	signal readResponse,writeResponse:i_transactor.t_bfm;
 	
 	type txStates is (idle,transmitting);
 	signal txFSM,i_txFSM:txStates;
