@@ -276,7 +276,7 @@ begin
 		
 		/* Tester variables. */
 		/* Synthesis-only randomisation. */
-		variable rand0:signed(63 downto 0);
+		variable rand0:signed(axiMaster_out.tData'high downto 0);
 		/* Simulation-only randomisation. */
 		/* synthesis translate_off */
 		variable rv0:RandomPType;
@@ -314,6 +314,21 @@ begin
 		end if;
 	end process sequencer_regs;
 	
+	/* Transaction counter. */
+    process(nReset,symbolsPerTransfer,irq_write) is begin
+        if not nReset then outstandingTransactions<=symbolsPerTransfer;
+        elsif falling_edge(irq_write) then
+            /* Use synchronous reset for outstandingTransactions to meet timing because it is a huge register set. */
+            if not nReset then outstandingTransactions<=symbolsPerTransfer;
+            else
+                if outstandingTransactions<1 then
+                    outstandingTransactions<=symbolsPerTransfer;
+                    report "No more pending transactions." severity note;
+                elsif axiMaster_in.tReady then outstandingTransactions<=outstandingTransactions-1;
+                end if;
+            end if;
+        end if;
+    end process;
 	
 	/* Reset symbolsPerTransfer to new value (prepare for new transfer) after current transfer has been completed. */
 	process(reset,irq_write) is

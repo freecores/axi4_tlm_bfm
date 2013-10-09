@@ -56,7 +56,7 @@ entity axiBfmMaster is
 --		axiSlave_out:buffer tAxi4Transactor_s2m;
 		
 		symbolsPerTransfer:in t_cnt;
-		outstandingTransactions:buffer t_cnt;
+		outstandingTransactions:in t_cnt;
 		
 		/* Debug ports. */
 --		dbg_cnt:out unsigned(9 downto 0);
@@ -76,22 +76,6 @@ architecture rtl of axiBfmMaster is
 	signal i_readResponse,i_writeResponse:t_bfm;
 	
 begin
-	/* Transaction counter. */
-	process(n_areset,symbolsPerTransfer,aclk) is begin
-		--if not n_areset then outstandingTransactions<=symbolsPerTransfer;
-		if falling_edge(aclk) then
-			/* Use synchronous reset for outstandingTransactions to meet timing because it is a huge register set. */
-			if not n_areset then outstandingTransactions<=symbolsPerTransfer;
-			else
-				if outstandingTransactions<1 then
-					outstandingTransactions<=symbolsPerTransfer;
-					report "No more pending transactions." severity note;
-				elsif axiMaster_in.tReady then outstandingTransactions<=outstandingTransactions-1;
-				end if;
-			end if;
-		end if;
-	end process;
-	
 	/* next-state logic for AXI4-Stream Master Tx BFM. */
 	axi_bfmTx_ns: process(all) is begin
 		axiTxState<=next_axiTxState;
