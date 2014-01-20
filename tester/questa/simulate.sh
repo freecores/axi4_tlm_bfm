@@ -39,18 +39,21 @@ vlib work; vmap work work;
 vlib osvvm; vmap osvvm osvvm;
 vlib tauhop; vmap tauhop tauhop;
 
-vcom -2008 -work osvvm ../../rtl/packages/os-vvm/SortListPkg_int.vhd \
-	../../rtl/packages/os-vvm/RandomBasePkg.vhd \
-	../../rtl/packages/os-vvm/RandomPkg.vhd \
-	../../rtl/packages/os-vvm/CoveragePkg.vhd \
+vcom -2008 -work osvvm ../../../rtl/packages/os-vvm/SortListPkg_int.vhd \
+	../../../rtl/packages/os-vvm/RandomBasePkg.vhd \
+	../../../rtl/packages/os-vvm/RandomPkg.vhd \
+	../../../rtl/packages/os-vvm/CoveragePkg.vhd \
 	| tee -ai ./simulate.log;
 
-vcom -2008 -work tauhop ../../rtl/packages/pkg-tlm.vhdl \
-	../../rtl/packages/pkg-axi-tlm.vhdl \
+vcom -2008 -work tauhop ../../../rtl/packages/pkg-tlm.vhdl \
+	../../../rtl/packages/pkg-axi-tlm.vhdl \
+	../../../rtl/packages/pkg-types.vhdl \
+	../../../rtl/axi4-stream-bfm-master.vhdl \
+	../../../rtl/galois-lfsr.vhdl \
+	../../../rtl/prbs-31.vhdl \
 	| tee -ai ./simulate.log;
 
-vcom -2008 -work work ../../rtl/axi4-stream-bfm-master.vhdl \
-	../../rtl/user.vhdl \
+vcom -2008 -work work ../../../rtl/user.vhdl \
 	| tee -ai ./simulate.log;
 
 errorStr=`grep "\*\* Error: " ./simulate.log`
