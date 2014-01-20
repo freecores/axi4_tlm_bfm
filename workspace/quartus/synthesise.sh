@@ -37,7 +37,7 @@ if [ `echo ${#errorStr}` -gt 0 ]
 then echo "Build error(s) exist. Refer to report files in the output_files directory for more details. Exiting."; exit;
 else
 	echo $(date "+[%Y-%m-%d %H:%M:%S]: Configuring device...");
-	quartus_pgm -c 'USB-Blaster [1-1.6]' -m jtag -o 'p;./output_files/axi4-tlm.sof';
+	quartus_pgm -c 'USB-Blaster [1-1.1]' -m jtag -o 'p;./output_files/axi4-tlm.sof';
 	
 fi
 
