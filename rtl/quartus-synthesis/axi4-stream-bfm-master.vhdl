@@ -38,13 +38,13 @@
 library ieee; use ieee.std_logic_1164.all, ieee.numeric_std.all;
 --library tauhop; use tauhop.axiTransactor.all;
 
---/* TODO remove once generic packages are supported. */
+/* TODO remove once generic packages are supported. */
 library tauhop; use tauhop.tlm.all, tauhop.axiTLM.all;
 
 entity axiBfmMaster is
 	port(aclk,n_areset:in std_ulogic;
 		/* BFM signalling. */
-		readRequest,writeRequest:in t_bfm:=((others=>'X'),(others=>'X'),false);
+		readRequest,writeRequest:in t_bfm:=(address=>(others=>'X'), message=>(others=>'X'), trigger=>false);
 		readResponse,writeResponse:buffer t_bfm;									-- use buffer until synthesis tools support reading from out ports.
 		
 		/* AXI Master interface */
@@ -69,13 +69,18 @@ architecture rtl of axiBfmMaster is
 	/* Finite-state Machines. */
 	signal axiTxState,next_axiTxState:axiBfmStatesTx:=idle;
 	
-	/* BFM signalling. */
-	signal i_readRequest:t_bfm:=((others=>'0'),(others=>'0'),false);
-	signal i_writeRequest:t_bfm:=((others=>'0'),(others=>'0'),false);
+	signal i_axiMaster_out:t_axi4StreamTransactor_m2s;
+	signal i_trigger,trigger:boolean;
 	
-	signal i_readResponse,i_writeResponse:t_bfm;
+	/* BFM signalling. */
+--	signal i_readRequest,i_writeRequest:t_bfm:=(address=>(others=>'X'),message=>(others=>'X'),trigger=>false);
+--	signal i_readResponse,i_writeResponse:t_bfm;
+	signal i_writeRequest:t_bfm:=(address=>(others=>'X'),message=>(others=>'X'),trigger=>false);
+	signal i_writeResponse:t_bfm;
 	
 begin
+	i_trigger<=writeRequest.trigger xor i_writeRequest.trigger;
+	
 	/* next-state logic for AXI4-Stream Master Tx BFM. */
 	axi_bfmTx_ns: process(all) is begin
 		axiTxState<=next_axiTxState;
@@ -84,7 +89,7 @@ begin
 		else
 			case next_axiTxState is
 				when idle=>
-					if writeRequest.trigger xor i_writeRequest.trigger then axiTxState<=payload; end if;
+					if i_trigger then axiTxState<=payload; end if;
 				when payload=>
 					if outstandingTransactions<1 then axiTxState<=endOfTx; end if;
 				when endOfTx=>
@@ -98,45 +103,38 @@ begin
 	axi_bfmTx_op: process(all) is begin
 		i_writeResponse<=writeResponse;
 		
-		axiMaster_out.tValid<=false;
-		axiMaster_out.tLast<=false;
-		axiMaster_out.tData<=(others=>'Z');
+		i_axiMaster_out.tValid<=false;
+		i_axiMaster_out.tLast<=false;
+		i_axiMaster_out.tData<=(others=>'Z');
 		i_writeResponse.trigger<=false;
 		
-		if writeRequest.trigger xor i_writeRequest.trigger then
-			axiMaster_out.tData<=writeRequest.message;
-			axiMaster_out.tValid<=true;
-		end if;
-		
-		if not n_areset then axiMaster_out.tData<=(others=>'Z');
-		else
-			case next_axiTxState is
-				when payload=>
-					axiMaster_out.tData<=writeRequest.message;
-					axiMaster_out.tValid<=true;
-					
-					if axiMaster_in.tReady then
-						i_writeResponse.trigger<=true;
-					end if;
-					
-					/* TODO change to a flag at user.vhdl. Move outstandingTransactions to user.vhdl. */
-					if outstandingTransactions<1 then axiMaster_out.tLast<=true; end if;
-				when others=> null;
-			end case;
-		end if;
+		case next_axiTxState is
+			when idle=>
+				if i_trigger then
+					i_axiMaster_out.tData<=writeRequest.message;
+					i_axiMaster_out.tValid<=true;
+				end if;
+			when payload=>
+				i_axiMaster_out.tData<=writeRequest.message;
+				i_axiMaster_out.tValid<=true;
+				
+				if axiMaster_in.tReady then
+					i_writeResponse.trigger<=true;
+				end if;
+				
+				if outstandingTransactions<1 then i_axiMaster_out.tLast<=true; end if;
+			when others=> null;
+		end case;
 	end process axi_bfmTx_op;
 	
 	/* state registers and pipelines for AXI4-Stream Tx BFM. */
-	process(n_areset,aclk) is begin
+	process(aclk) is begin
 		if falling_edge(aclk) then
 			next_axiTxState<=axiTxState;
 			i_writeRequest<=writeRequest;
-		end if;
-	end process;
-	
-	process(aclk) is begin
-		if rising_edge(aclk) then
 			writeResponse<=i_writeResponse;
+			axiMaster_out<=i_axiMaster_out;
+			trigger<=i_trigger;
 		end if;
 	end process;
 	

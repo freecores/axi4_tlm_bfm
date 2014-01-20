@@ -49,7 +49,7 @@ package tlm is
 	
 	/* TODO remove once generic packages are supported. */
 	subtype t_addr is unsigned(31 downto 0);
-	subtype t_msg is signed(63 downto 0);
+	subtype t_msg is signed(31 downto 0);
 	subtype t_cnt is unsigned(127 downto 0);
 	
 	/* BFM control interface. */

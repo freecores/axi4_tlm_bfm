@@ -41,7 +41,7 @@ library tauhop; use tauhop.axiTransactor.all;
 --/* TODO remove once generic packages are supported. */
 --library tauhop; use tauhop.tlm.all, tauhop.axiTLM.all;
 
-entity axiBfmMaster is --generic(constant maxTransactions:positive);
+entity axiBfmMaster is
 	port(aclk,n_areset:in std_ulogic;
 		/* BFM signalling. */
 		readRequest,writeRequest:in i_transactor.t_bfm:=(address=>(others=>'X'), message=>(others=>'X'), trigger=>false);
@@ -70,12 +70,17 @@ architecture rtl of axiBfmMaster is
 	signal axiTxState,next_axiTxState:axiBfmStatesTx:=idle;
 	
 	signal i_axiMaster_out:t_axi4StreamTransactor_m2s;
+	signal i_trigger,trigger:boolean;
 	
 	/* BFM signalling. */
-	signal i_readRequest,i_writeRequest:i_transactor.t_bfm:=(address=>(others=>'X'),message=>(others=>'X'),trigger=>false);
-	signal i_readResponse,i_writeResponse:i_transactor.t_bfm;
+--	signal i_readRequest,i_writeRequest:i_transactor.t_bfm:=(address=>(others=>'X'),message=>(others=>'X'),trigger=>false);
+--	signal i_readResponse,i_writeResponse:i_transactor.t_bfm;
+	signal i_writeRequest:i_transactor.t_bfm:=(address=>(others=>'X'),message=>(others=>'X'),trigger=>false);
+	signal i_writeResponse:i_transactor.t_bfm;
 	
 begin
+	i_trigger<=writeRequest.trigger xor i_writeRequest.trigger;
+	
 	/* next-state logic for AXI4-Stream Master Tx BFM. */
 	axi_bfmTx_ns: process(all) is begin
 		axiTxState<=next_axiTxState;
@@ -84,7 +89,7 @@ begin
 		else
 			case next_axiTxState is
 				when idle=>
-					if writeRequest.trigger xor i_writeRequest.trigger then axiTxState<=payload; end if;
+					if i_trigger then axiTxState<=payload; end if;
 				when payload=>
 					if outstandingTransactions<1 then axiTxState<=endOfTx; end if;
 				when endOfTx=>
@@ -103,13 +108,12 @@ begin
 		i_axiMaster_out.tData<=(others=>'Z');
 		i_writeResponse.trigger<=false;
 		
-		if writeRequest.trigger xor i_writeRequest.trigger then
-			i_axiMaster_out.tData<=writeRequest.message;
-			i_axiMaster_out.tValid<=true;
-		end if;
-		
 		case next_axiTxState is
-			when idle=> null;
+			when idle=>
+				if i_trigger then
+					i_axiMaster_out.tData<=writeRequest.message;
+					i_axiMaster_out.tValid<=true;
+				end if;
 			when payload=>
 				i_axiMaster_out.tData<=writeRequest.message;
 				i_axiMaster_out.tValid<=true;
@@ -123,20 +127,15 @@ begin
 		end case;
 	end process axi_bfmTx_op;
 	
-	axiMaster_out<=i_axiMaster_out;
-	
 	/* state registers and pipelines for AXI4-Stream Tx BFM. */
-	process(n_areset,aclk) is begin
+	process(aclk) is begin
 		if falling_edge(aclk) then
 			next_axiTxState<=axiTxState;
 			i_writeRequest<=writeRequest;
-			--axiMaster_out<=i_axiMaster_out;
+			writeResponse<=i_writeResponse;
+			axiMaster_out<=i_axiMaster_out;
+			trigger<=i_trigger;
 		end if;
 	end process;
 	
-	process(aclk) is begin
-		if rising_edge(aclk) then
-			writeResponse<=i_writeResponse;
-		end if;
-	end process;
 end architecture rtl;

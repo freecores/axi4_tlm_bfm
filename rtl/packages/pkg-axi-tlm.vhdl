@@ -140,9 +140,9 @@ package axiTLM is
 		tStrb:t_qualifier;
 		tKeep:t_qualifier;
 		tLast:boolean;
-		tId:t_id;
-		tDest:t_dest;
-		tUser:t_user;
+--		tId:t_id;
+--		tDest:t_dest;
+--		tUser:t_user;
 	end record t_axi4StreamTransactor_m2s;
 	
 	type t_axi4StreamTransactor_s2m is record
@@ -156,7 +156,8 @@ package axiTLM is
 --		cActive:
 --	end record tAxiTransactor_lp;
 	
-	type axiBfmStatesTx is (idle,sendAddr,startOfPacket,payload,endOfPacket,endOfTx);
+--	type axiBfmStatesTx is (idle,sendAddr,startOfPacket,payload,endOfPacket,endOfTx);
+	type axiBfmStatesTx is (idle,payload,endOfTx);
 	type axiBfmStatesRx is (idle,checkAddr,startOfPacket,payload);
 end package axiTLM;
 
@@ -181,7 +182,8 @@ library ieee; use ieee.std_logic_1164.all, ieee.numeric_std.all;
 library tauhop;
 package transactor is new tauhop.tlm generic map(
 	t_addr=>unsigned(31 downto 0),		-- default assignment. Used only for non-stream interfaces.
-	t_msg=>signed(63 downto 0),
+--	t_msg=>signed(63 downto 0),
+	t_msg=>signed(31 downto 0),
 	t_cnt=>unsigned(127 downto 0)
 );
 

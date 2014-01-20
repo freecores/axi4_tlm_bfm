@@ -49,42 +49,38 @@ library altera; use altera.stp;
 
 entity user is port(
 	/* Comment-out for simulation. */
-	clk,nReset:in std_ulogic;
+	clk,reset:in std_ulogic;
 	
 	/* AXI Master interface */
 --	axiMaster_in:in t_axi4StreamTransactor_s2m;
-	axiMaster_out:buffer t_axi4StreamTransactor_m2s
+	axiMaster_out:buffer t_axi4StreamTransactor_m2s;
 	
 	/* Debug ports. */
+	selTxn:in unsigned(3 downto 0):=x"0"
 );
 end entity user;
 
 architecture rtl of user is
+	signal i_reset:std_ulogic:='0';
+	signal porCnt:unsigned(3 downto 0);
+	
 	/* Global counters. */
 	constant maxSymbols:positive:=2048;		--maximum number of symbols allowed to be transmitted in a frame. Each symbol's width equals tData's width. 
 	signal symbolsPerTransfer:t_cnt;
 	signal outstandingTransactions:t_cnt;
 	
 	/* BFM signalling. */
-	signal readRequest:t_bfm:=((others=>'0'),(others=>'0'),false);
-	signal writeRequest:t_bfm:=((others=>'0'),(others=>'0'),false);
-	signal readResponse:t_bfm;
-	signal writeResponse:t_bfm;
-	
-	type txStates is (idle,transmitting);
-	signal txFSM,i_txFSM:txStates;
+	signal readRequest,writeRequest:t_bfm:=(address=>(others=>'X'),message=>(others=>'X'),trigger=>false);
+	signal readResponse,writeResponse:t_bfm;
 	
 	/* Tester signals. */
 	/* synthesis translate_off */
 	signal clk,reset:std_ulogic:='0';
+	attribute period:time; attribute period of clk:signal is 10 ps;
 	/* synthesis translate_on */
 	
-	signal cnt:unsigned(3 downto 0);
-	signal reset:std_ulogic:='0';
-	signal testerClk:std_ulogic;
-	--signal trigger:boolean;
 	signal dbg_axiTxFSM:axiBfmStatesTx;
-	signal anlysr_dataIn:std_logic_vector(127 downto 0);
+	signal anlysr_dataIn:std_logic_vector(255 downto 0);
 	signal anlysr_trigger:std_ulogic;
 	
 	signal axiMaster_in:t_axi4StreamTransactor_s2m;
@@ -94,7 +90,7 @@ begin
 	/* Bus functional models. */
 	axiMaster: entity tauhop.axiBfmMaster(rtl)
 		port map(
-			aclk=>irq_write, n_areset=>not reset,
+			aclk=>irq_write, n_areset=>not i_reset,
 			
 			readRequest=>readRequest,	writeRequest=>writeRequest,
 			readResponse=>readResponse,	writeResponse=>writeResponse,
@@ -106,263 +102,39 @@ begin
 			dbg_axiTxFSM=>dbg_axiTxFSM
 	);
 	
-	/* Interrupt-request generator. */
-	irq_write<=clk when not reset else '0';
-	
-	/* Simulation Tester. */
-	/* PLL to generate tester's clock. */
-	f100MHz: entity altera.pll(syn) port map(
-		areset=>'0',	--not nReset,
-		inclk0=>clk,
-		c0=>testerClk,
-		locked=>open
-	);
-	
-	/* synthesis translate_off */
-	clk<=not clk after 10 ps;
-	process is begin
-		nReset<='1'; wait for 1 ps;
-		nReset<='0'; wait for 500 ps;
-		nReset<='1';
-		wait;
-	end process;
-	/* synthesis translate_on */
-	
-	
-	/* Hardware tester. */
-	por: process(nReset,clk) is
-		--variable cnt:unsigned(7 downto 0):=(others=>'1');
-	begin
-		if not nReset then cnt<=(others=>'1');
+	/* Clocks and reset. */
+	/* Power-on Reset circuitry. */
+	por: process(reset,clk) is begin
+		if reset then i_reset<='1'; porCnt<=(others=>'1');
 		elsif rising_edge(clk) then
-			reset<='0';
+			i_reset<='0';
 			
-			if cnt>0 then reset<='1'; cnt<=cnt-1; end if;
+			if porCnt>0 then i_reset<='1'; porCnt<=porCnt-1; end if;
 		end if;
 	end process por;
 	
-	/* SignalTap II embedded logic analyser. Included as part of BiST architecture. */
-	--anlysr_trigger<='1' when writeRequest.trigger else '0';
-	anlysr_trigger<='1' when reset else '0';
-	
-	/* Disable this for synthesis as this is not currently synthesisable.
-		Pull the framerFSM statemachine signal from lower down the hierarchy to this level instead.
-	*/
 	/* synthesis translate_off */
-	--framerFSM<=to_unsigned(<<signal framers_txs(0).i_framer.framerFSM: framerFsmStates>>,framerFSM'length);
-	/* synthesis translate_on */
-	
-	anlysr_dataIn(7 downto 0)<=std_logic_vector(symbolsPerTransfer(7 downto 0));
-	anlysr_dataIn(15 downto 8)<=std_logic_vector(outstandingTransactions(7 downto 0));
-	--anlysr_dataIn(2 downto 0) <= <<signal axiMaster.axiTxState:axiBfmStatesTx>>;
-	anlysr_dataIn(17 downto 16)<=to_std_logic_vector(dbg_axiTxFSM);
-	anlysr_dataIn(18)<='1' when clk else '0';
-	anlysr_dataIn(19)<='1' when reset else '0';
-	anlysr_dataIn(20)<='1' when irq_write else '0';
-	anlysr_dataIn(21)<='1' when axiMaster_in.tReady else '0';
-	anlysr_dataIn(22)<='1' when axiMaster_out.tValid else '0';
-	anlysr_dataIn(86 downto 23)<=std_logic_vector(axiMaster_out.tData);
-	anlysr_dataIn(90 downto 87)<=std_logic_vector(axiMaster_out.tStrb);
-	anlysr_dataIn(94 downto 91)<=std_logic_vector(axiMaster_out.tKeep);
-	anlysr_dataIn(95)<='1' when axiMaster_out.tLast else '0';
-	anlysr_dataIn(96)<='1' when writeRequest.trigger else '0';
-	anlysr_dataIn(97)<='1' when writeResponse.trigger else '0';
-	--anlysr_dataIn(99 downto 98)<=to_std_logic_vector(txFSM);
-	anlysr_dataIn(101 downto 98)<=std_logic_vector(cnt);
-	
-	anlysr_dataIn(anlysr_dataIn'high downto 106)<=(others=>'0');
-	
-	
-	/* Simulate only if you have compiled Altera's simulation libraries. */
-	i_bist_logicAnalyser: entity altera.stp(syn) port map(
-		acq_clk=>testerClk,
-		acq_data_in=>anlysr_dataIn,
-		acq_trigger_in=>"1",
-		trigger_in=>anlysr_trigger
-	);
-	
-	
-	
-	/* Stimuli sequencer. TODO move to tester/stimuli.
-		This emulates the AXI4-Stream Slave.
-	*/
-	/* Simulation-only stimuli sequencer. */
-	/* synthesis translate_off */
+	clk<=not clk after clk'period/2;
 	process is begin
-		/* Fast read. */
-		while not axiMaster_out.tLast loop
-			/* Wait for tValid to assert. */
-			while not axiMaster_out.tValid loop
-				wait until falling_edge(clk);
-			end loop;
-			
-			axiMaster_in.tReady<=true;
-			
-			wait until falling_edge(clk);
-			axiMaster_in.tReady<=false;
-		end loop;
-		
-		wait until falling_edge(clk);
-		
-		/* Normal read. */
-		while not axiMaster_out.tLast loop
-			/* Wait for tValid to assert. */
-			while not axiMaster_out.tValid loop
-				wait until falling_edge(clk);
-			end loop;
-			
-			wait until falling_edge(clk);
-			axiMaster_in.tReady<=true;
-			
-			wait until falling_edge(clk);
-			axiMaster_in.tReady<=false;
-		end loop;
-		
-		for i in 0 to 10 loop
-			wait until falling_edge(clk);
-		end loop;
-		
-		/* One-shot read. */
-		axiMaster_in.tReady<=true;
-		
-		wait until falling_edge(clk);
-		axiMaster_in.tReady<=false;
-		
+		reset<='0'; wait for 1 ps;
+		reset<='1'; wait for 500 ps;
+		reset<='0';
 		wait;
 	end process;
 	/* synthesis translate_on */
 	
-	/* Synthesisable stimuli sequencer. */
-	process(clk) is begin
-		if falling_edge(clk) then
-			axiMaster_in.tReady<=false;
-			--if axiMaster_out.tValid and not axiMaster_out.tLast then
-			if not axiMaster_in.tReady and axiMaster_out.tValid and not axiMaster_out.tLast then
-				axiMaster_in.tReady<=true;
-			end if;
-		end if;
-	end process;
+	/* Simulation Tester. */
 	
-	
-	/* Data transmitter. */
-	sequencer_ns: process(all) is begin
-		txFSM<=i_txFSM;
-		if reset then txFSM<=idle;
-		else
-			case i_txFSM is
-				when idle=>
-					if outstandingTransactions>0 then txFSM<=transmitting; end if;
-				when transmitting=>
-					if axiMaster_out.tLast then
-						txFSM<=idle;
-					end if;
-				when others=> null;
-			end case;
-		end if;
-	end process sequencer_ns;
-	
-	/* Data transmitter. */
-	sequencer_op: process(reset,irq_write) is
-		/* Local procedures to map BFM signals with the package procedure. */
-		procedure read(address:in t_addr) is begin
-			read(readRequest,address);
-		end procedure read;
-		
-		procedure write(data:in t_msg) is begin
-			write(request=>writeRequest, address=>(others=>'-'), data=>data);
-		end procedure write;
-		
-		variable isPktError:boolean;
-		
-		/* Tester variables. */
-		/* Synthesis-only randomisation. */
-		variable rand0:signed(axiMaster_out.tData'high downto 0);
-		/* Simulation-only randomisation. */
-		/* synthesis translate_off */
-		variable rv0:RandomPType;
-		/* synthesis translate_on */
-		
-	begin
-		if reset then
-			/* synthesis only. */
-			rand0:=(others=>'0');
-			
-			/* simulation only. */
-			/* synthesis translate_off */
-			rv0.InitSeed(rv0'instance_name);
-			/* synthesis translate_on */
-			
-			--txFSM<=idle;
-		elsif falling_edge(irq_write) then
-			case txFSM is
-				when transmitting=>
-					if txFSM/=i_txFSM or writeResponse.trigger then
-						/* synthesis translate_off */
-						write(rv0.RandSigned(axiMaster_out.tData'length));
-						/* synthesis translate_on */
-						write(rand0);
-						rand0:=rand0+1;
-					end if;
-				when others=>null;
-			end case;
-		end if;
-	end process sequencer_op;
-	
-	sequencer_regs: process(irq_write) is begin
-		if falling_edge(irq_write) then
-			i_txFSM<=txFSM;
-		end if;
-	end process sequencer_regs;
-	
-	/* Transaction counter. */
-    process(nReset,symbolsPerTransfer,irq_write) is begin
-        if not nReset then outstandingTransactions<=symbolsPerTransfer;
-        elsif falling_edge(irq_write) then
-            /* Use synchronous reset for outstandingTransactions to meet timing because it is a huge register set. */
-            if not nReset then outstandingTransactions<=symbolsPerTransfer;
-            else
-                if outstandingTransactions<1 then
-                    outstandingTransactions<=symbolsPerTransfer;
-                    report "No more pending transactions." severity note;
-                elsif axiMaster_in.tReady then outstandingTransactions<=outstandingTransactions-1;
-                end if;
-            end if;
-        end if;
-    end process;
-	
-	/* Reset symbolsPerTransfer to new value (prepare for new transfer) after current transfer has been completed. */
-	process(reset,irq_write) is
-		/* synthesis translate_off */
-		variable rv0:RandomPType;
-		/* synthesis translate_on */
-	begin
-		if reset then
-			/* synthesis translate_off */
-			rv0.InitSeed(rv0'instance_name);
-			symbolsPerTransfer<=120x"0" & rv0.RandUnsigned(8);
-			report "symbols per transfer = 0x" & ieee.numeric_std.to_hstring(rv0.RandUnsigned(axiMaster_out.tData'length));
-			/* synthesis translate_on */
-			
-			symbolsPerTransfer<=128x"8";
-		elsif rising_edge(irq_write) then
-			if axiMaster_out.tLast then
-				/* synthesis only. */
-				/* Testcase 1: number of symbols per transfer becomes 0 after first stream transfer. */
-				--symbolsPerTransfer<=(others=>'0');
-				
-				/* Testcase 2: number of symbols per transfer is randomised. */
-				--uniform(seed0,seed1,rand0);
-				--symbolsPerTransfer<=120x"0" & to_unsigned(integer(rand0 * 2.0**8),8);	--symbolsPerTransfer'length
-				--report "symbols per transfer = " & ieee.numeric_std.to_hstring(to_unsigned(integer(rand0 * 2.0**8),8));	--axiMaster_out.tData'length));
-				
-				
-				/* synthesis translate_off */
-				symbolsPerTransfer<=120x"0" & rv0.RandUnsigned(8);
-				report "symbols per transfer = 0x" & ieee.numeric_std.to_hstring(rv0.RandUnsigned(axiMaster_out.tData'length));
-				/* synthesis translate_on */
-				
-				symbolsPerTransfer<=128x"0f";		--128x"ffffffff_ffffffff_ffffffff_ffffffff";
-			end if;
-		end if;
-	end process;
+	/* Hardware tester. */
+	bist: entity work.tester(rtl) port map(
+		clk=>clk, reset=>i_reset,
+		axiMaster_in=>axiMaster_in,
+		axiMaster_out=>axiMaster_out,
+		readRequest=>readRequest, writeRequest=>writeRequest,
+		readResponse=>readResponse, writeResponse=>writeResponse,
+		irq_write=>irq_write,
+		symbolsPerTransfer=>symbolsPerTransfer,
+		outstandingTransactions=>outstandingTransactions,
+		selTxn=>selTxn
+	);
 end architecture rtl;
