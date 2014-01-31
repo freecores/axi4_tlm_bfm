@@ -156,12 +156,25 @@ package axiTLM is
 --		cActive:
 --	end record tAxiTransactor_lp;
 	
---	type axiBfmStatesTx is (idle,sendAddr,startOfPacket,payload,endOfPacket,endOfTx);
+	type t_fsm is (idle,sendAddr,startOfPacket,payload,endOfPacket,endOfTx);
 	type axiBfmStatesTx is (idle,payload,endOfTx);
 	type axiBfmStatesRx is (idle,checkAddr,startOfPacket,payload);
+	
+	function to_std_logic_vector(fsm:axiBfmStatesTx) return std_logic_vector;
 end package axiTLM;
 
 package body axiTLM is
+	function to_std_logic_vector(fsm:axiBfmStatesTx) return std_logic_vector is
+		variable r:std_logic_vector(1 downto 0);
+	begin
+		case fsm is
+			when idle=>		r:=2x"0";
+			when payload=>	r:=2x"1";
+			when endOfTx=>	r:=2x"2";
+			when others=>	null;
+		end case;
+		return r;
+	end function to_std_logic_vector;
 end package body axiTLM;
 
 

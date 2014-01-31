@@ -56,12 +56,12 @@ entity axiBfmMaster is
 --		axiSlave_out:buffer tAxi4Transactor_s2m;
 		
 		symbolsPerTransfer:in i_transactor.t_cnt;
-		outstandingTransactions:in i_transactor.t_cnt
+		outstandingTransactions:in i_transactor.t_cnt;
 		
 		/* Debug ports. */
 --		dbg_cnt:out unsigned(9 downto 0);
 --		dbg_axiRxFsm:out axiBfmStatesRx:=idle;
---		dbg_axiTxFsm:out axiBfmStatesTx:=idle
+		dbg_axiTxFsm:out axiBfmStatesTx:=idle
 	);
 end entity axiBfmMaster;
 
@@ -138,4 +138,5 @@ begin
 		end if;
 	end process;
 	
+	dbg_axiTxFSM<=axiTxState;
 end architecture rtl;
