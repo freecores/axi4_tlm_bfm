@@ -29,12 +29,17 @@ rem
 rem 	@Description:
 rem 
 
-rem read -p "press Enter to run full simulation now, or Ctrl-C to exit: ";
+rem Remove logs, and previous compilation netlist files.
 del modelsim.ini ./simulate.log ./work ./altera ./osvvm ./tauhop
 
-vlib work; vmap work work
-vlib osvvm; vmap osvvm osvvm
-vlib tauhop; vmap tauhop tauhop
+vlib work
+vmap work work
+
+vlib osvvm
+vmap osvvm osvvm
+
+vlib tauhop
+vmap tauhop tauhop
 
 vcom -2008 -work osvvm ../../../rtl/packages/os-vvm/SortListPkg_int.vhd ../../../rtl/packages/os-vvm/RandomBasePkg.vhd ../../../rtl/packages/os-vvm/RandomPkg.vhd ../../../rtl/packages/os-vvm/CoveragePkg.vhd
 
@@ -43,4 +48,4 @@ vcom -2008 -work tauhop ../../../rtl/packages/pkg-tlm.vhdl ../../../rtl/packages
 vcom -2008 -work work ../../../tester/tester.vhdl ../../../rtl/user.vhdl
 
 rem Make sure you have no compilation errors before you run vsim.
-rem vsim -t ps -do ./waves.do -voptargs="+acc" "work.user(rtl)";
+rem vsim -t ps -do ./waves.do -voptargs="+acc" "work.user(rtl)"
