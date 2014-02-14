@@ -1,5 +1,3 @@
-rem !/bin/bash
-rem 
 rem 	Example bash script for Mentor Graphics QuestaSim/ModelSim simulation.
 rem 	
 rem 	Author(s): 
@@ -41,11 +39,11 @@ vmap osvvm osvvm
 vlib tauhop
 vmap tauhop tauhop
 
-vcom -2008 -work osvvm ../../../rtl/packages/os-vvm/SortListPkg_int.vhd ../../../rtl/packages/os-vvm/RandomBasePkg.vhd ../../../rtl/packages/os-vvm/RandomPkg.vhd ../../../rtl/packages/os-vvm/CoveragePkg.vhd
+vcom -2008 -work osvvm "../../../rtl/packages/os-vvm/SortListPkg_int.vhd" "../../../rtl/packages/os-vvm/RandomBasePkg.vhd" "../../../rtl/packages/os-vvm/RandomPkg.vhd" "../../../rtl/packages/os-vvm/CoveragePkg.vhd"
 
-vcom -2008 -work tauhop ../../../rtl/packages/pkg-tlm.vhdl ../../../rtl/packages/pkg-axi-tlm.vhdl ../../../rtl/packages/pkg-types.vhdl ../../../rtl/axi4-stream-bfm-master.vhdl ../../../tester/stimuli/galois-lfsr.vhdl ../../../tester/stimuli/prbs-31.vhdl
+vcom -2008 -work tauhop "../../../rtl/packages/pkg-tlm.vhdl" "../../../rtl/packages/pkg-axi-tlm.vhdl" "../../../rtl/packages/pkg-types.vhdl" "../../../rtl/axi4-stream-bfm-master.vhdl" "../../../tester/stimuli/galois-lfsr.vhdl" "../../../tester/stimuli/prbs-31.vhdl"
 
-vcom -2008 -work work ../../../tester/tester.vhdl ../../../rtl/user.vhdl
+vcom -2008 -work work "../../../tester/tester.vhdl" "../../../rtl/user.vhdl"
 
 rem Make sure you have no compilation errors before you run vsim.
 rem vsim -t ps -do ./waves.do -voptargs="+acc" "work.user(rtl)"
