@@ -37,8 +37,9 @@
 
 
 set_global_assignment -name FAMILY "Cyclone IV E"
-set_global_assignment -name DEVICE EP4CE22F17C7
+set_global_assignment -name DEVICE EP4CE115F29C7
 set_global_assignment -name TOP_LEVEL_ENTITY "user"
+#set_global_assignment -name TOP_LEVEL_ENTITY "user"
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 12.1
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "23:27:13  SEPTEMBER 06, 2013"
 set_global_assignment -name LAST_QUARTUS_VERSION 12.1
@@ -51,18 +52,13 @@ set_global_assignment -name EDA_OUTPUT_DATA_FORMAT VHDL -section_id eda_simulati
 set_global_assignment -name VHDL_INPUT_VERSION VHDL_2008
 set_global_assignment -name VHDL_SHOW_LMF_MAPPING_MESSAGES OFF
 
-# NEEK kit:
-#set_location_assignment PIN_M23 -to nReset
-#set_location_assignment PIN_Y2 -to clk
-#
-# BeMicro kit:
-set_location_assignment PIN_R7 -to reset
-set_location_assignment PIN_E1 -to clk
+set_location_assignment PIN_M23 -to reset
+set_location_assignment PIN_Y2 -to clk
 
 
-set_global_assignment -name PARTITION_NETLIST_TYPE POST_FIT -section_id Top
-set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
-set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
+#set_global_assignment -name VHDL_FILE "../../../rtl/quartus-synthesis/user-hw-tlm-paper.vhdl"
+
+
 
 set_global_assignment -name VHDL_FILE "../../../rtl/quartus-synthesis/pkg-types.vhdl"
 set_global_assignment -name VHDL_FILE "../../../rtl/quartus-synthesis/pkg-tlm.vhdl"
@@ -76,5 +72,10 @@ set_global_assignment -name VHDL_FILE "../../../rtl/quartus-synthesis/tester.vhd
 set_global_assignment -name VHDL_FILE "../../../rtl/quartus-synthesis/axi4-interface.vhdl"
 #set_global_assignment -name VHDL_FILE "../../../rtl/quartus-synthesis/user-hw-tlm-paper.vhdl"
 set_global_assignment -name VHDL_FILE "../../../rtl/quartus-synthesis/user.vhdl"
+set_global_assignment -name PARTITION_NETLIST_TYPE POST_FIT -section_id Top
+set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
+set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
+
+
 
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
