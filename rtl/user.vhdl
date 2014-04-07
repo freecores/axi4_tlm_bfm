@@ -66,8 +66,9 @@ architecture rtl of user is
 	
 	/* Global counters. */
 	constant maxSymbols:positive:=2048;		--maximum number of symbols allowed to be transmitted in a frame. Each symbol's width equals tData's width. 
-	signal symbolsPerTransfer:i_transactor.t_cnt;
-	signal outstandingTransactions:i_transactor.t_cnt;
+	signal symbolsPerTransfer:i_transactor.t_cnt;			--TODO deprecate.
+	signal outstandingTransactions:i_transactor.t_cnt;		--TODO deprecate.
+	signal lastTransaction:boolean;
 	
 	/* BFM signalling. */
 	signal readRequest,writeRequest:i_transactor.t_bfm:=(address=>(others=>'X'),message=>(others=>'X'),trigger=>false);
@@ -97,8 +98,7 @@ begin
 			axiMaster_in=>axiMaster_in,
 			axiMaster_out=>axiMaster_out,
 			
-			symbolsPerTransfer=>symbolsPerTransfer,
-			outstandingTransactions=>outstandingTransactions,
+			lastTransaction=>lastTransaction,
 			dbg_axiTxFSM=>dbg_axiTxFSM
 	);
 	
@@ -133,8 +133,7 @@ begin
 		readRequest=>readRequest, writeRequest=>writeRequest,
 		readResponse=>readResponse, writeResponse=>writeResponse,
 		irq_write=>irq_write,
-		symbolsPerTransfer=>symbolsPerTransfer,
-		outstandingTransactions=>outstandingTransactions,
+		lastTransaction=>lastTransaction,
 		selTxn=>selTxn
 	);
 end architecture rtl;

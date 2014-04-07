@@ -55,8 +55,9 @@ entity axiBfmMaster is
 --		axiSlave_in:in tAxi4Transactor_m2s;
 --		axiSlave_out:buffer tAxi4Transactor_s2m;
 		
-		symbolsPerTransfer:in i_transactor.t_cnt;
-		outstandingTransactions:in i_transactor.t_cnt;
+--		symbolsPerTransfer:in i_transactor.t_cnt;
+--		outstandingTransactions:in i_transactor.t_cnt;
+		lastTransaction:in boolean;
 		
 		/* Debug ports. */
 --		dbg_cnt:out unsigned(9 downto 0);
@@ -91,7 +92,7 @@ begin
 				when idle=>
 					if i_trigger then axiTxState<=payload; end if;
 				when payload=>
-					if outstandingTransactions<1 then axiTxState<=endOfTx; end if;
+					if lastTransaction then axiTxState<=endOfTx; end if;
 				when endOfTx=>
 					axiTxState<=idle;
 				when others=>axiTxState<=idle;
@@ -103,26 +104,29 @@ begin
 	axi_bfmTx_op: process(all) is begin
 		i_writeResponse<=writeResponse;
 		
-		i_axiMaster_out.tValid<=false;
 		i_axiMaster_out.tLast<=false;
-		i_axiMaster_out.tData<=(others=>'Z');
 		i_writeResponse.trigger<=false;
 		
 		case next_axiTxState is
 			when idle=>
+				i_axiMaster_out.tValid<=false;
+				i_axiMaster_out.tData<=(others=>'Z');
+				
 				if i_trigger then
 					i_axiMaster_out.tData<=writeRequest.message;
 					i_axiMaster_out.tValid<=true;
 				end if;
-			when payload=>
-				i_axiMaster_out.tData<=writeRequest.message;
-				i_axiMaster_out.tValid<=true;
+			when payload | endOfTx =>
+				if i_trigger then
+					i_axiMaster_out.tData<=writeRequest.message;
+					i_axiMaster_out.tValid<=true;
+				end if;
 				
 				if axiMaster_in.tReady then
 					i_writeResponse.trigger<=true;
 				end if;
 				
-				if outstandingTransactions<1 then i_axiMaster_out.tLast<=true; end if;
+				if lastTransaction then i_axiMaster_out.tLast<=true; end if;
 			when others=> null;
 		end case;
 	end process axi_bfmTx_op;
