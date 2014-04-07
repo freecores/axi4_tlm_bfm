@@ -34,14 +34,14 @@
 	Public License along with this source; if not, download it 
 	from http://www.opencores.org/lgpl.shtml.
 */
-library ieee; use ieee.std_logic_1164.all, ieee.numeric_std.all; use ieee.math_real.all;
+library ieee; use ieee.std_logic_1164.all, ieee.numeric_std.all, ieee.math_real.all;
 library tauhop; use tauhop.transactor.all, tauhop.axiTransactor.all;		--TODO just use axiTransactor here as transactor should already be wrapped up.
 
 /* TODO remove once generic packages are supported. */
 --library tauhop; use tauhop.tlm.all, tauhop.axiTLM.all;
 
 /* synthesis translate_off */
-library osvvm; use osvvm.RandomPkg.all; use osvvm.CoveragePkg.all;
+library osvvm; use osvvm.RandomPkg.all, osvvm.CoveragePkg.all;
 /* synthesis translate_on */
 
 --library altera; use altera.stp;
@@ -63,8 +63,7 @@ entity tester is port(
 	
 	irq_write:buffer std_ulogic;		-- clock gating.
 	
-	symbolsPerTransfer:buffer t_cnt;
-	outstandingTransactions:buffer t_cnt;
+	lastTransaction:out boolean;
 	
 	/* Debug ports. */
 --	dataIn:in t_msg;
@@ -106,6 +105,12 @@ architecture rtl of tester is
 	
 	signal prbs:t_msg;
 	
+	/* Coverage-driven randomisation. */
+	shared variable rv0:covPType;
+	signal rv:integer;
+	signal pctCovered:real;
+	signal isCovered,i_isCovered:boolean;
+	
 begin
 	/* PLL to generate tester's clock. */
 /*    f100MHz: entity altera.pll(syn) port map(
@@ -130,8 +135,8 @@ begin
 	--framerFSM<=to_unsigned(<<signal framers_txs(0).i_framer.framerFSM: framerFsmStates>>,framerFSM'length);
 	/* synthesis translate_on */
 	
-	anlysr_dataIn(7 downto 0)<=std_logic_vector(symbolsPerTransfer(7 downto 0));
-	anlysr_dataIn(15 downto 8)<=std_logic_vector(outstandingTransactions(7 downto 0));
+--	anlysr_dataIn(7 downto 0)<=std_logic_vector(symbolsPerTransfer(7 downto 0));
+--	anlysr_dataIn(15 downto 8)<=std_logic_vector(outstandingTransactions(7 downto 0));
 	--anlysr_dataIn(2 downto 0) <= <<signal axiMaster.axiTxState:axiBfmStatesTx>>;
 	anlysr_dataIn(17 downto 16)<=to_std_logic_vector(dbg_axiTxFSM);
 	anlysr_dataIn(18)<='1' when clk else '0';
@@ -170,9 +175,8 @@ begin
 	/* Simulation-only stimuli sequencer. */
 	/* synthesis translate_off */
 	process is begin
-		report "Performing fast read..." severity note;
-		
 		/* Fast read. */
+		report "Performing fast read..." severity note;
 		while not axiMaster_out.tLast loop
 			/* Wait for tValid to assert. */
 			while not axiMaster_out.tValid loop
@@ -183,13 +187,19 @@ begin
 			
 			wait until falling_edge(clk);
 			axiMaster_in.tReady<=false;
+			
+			report "coverage: " & to_string(pctCovered) severity note;
 		end loop;
+		report "coverage: " & to_string(pctCovered) severity note;
+		report "Completed fast read." severity note;
 		
 		wait until falling_edge(clk);
-		report "Performing normal read..." severity note;
 		
 		/* Normal read. */
+		report "Performing normal read..." severity note;
 		while not axiMaster_out.tLast loop
+			wait until falling_edge(clk);
+			
 			/* Wait for tValid to assert. */
 			while not axiMaster_out.tValid loop
 				wait until falling_edge(clk);
@@ -202,9 +212,11 @@ begin
 			wait until falling_edge(clk);
 			axiMaster_in.tReady<=false;
 			
-			wait until falling_edge(clk);
+			--wait until falling_edge(clk);
+			
+			report "coverage: " & to_string(pctCovered) severity note;
 		end loop;
-		
+		report "coverage: " & to_string(pctCovered) severity note;
 		report "Completed normal read." severity note;
 		
 		for i in 0 to 10 loop
@@ -212,11 +224,13 @@ begin
 		end loop;
 		
 		/* One-shot read. */
+		report "Performing one-shot read..." severity note;
 		axiMaster_in.tReady<=true;
 		
 		wait until falling_edge(clk);
 		axiMaster_in.tReady<=false;
 		
+		report "coverage: " & to_string(pctCovered) severity note;
 		report "Completed one-shot read." severity note;
 		
 		wait;
@@ -236,6 +250,7 @@ begin
 */	
 	
 	/* Data transmitter. */
+	/* Use either PRBS (LFSR) stimuli, or OSVVM randomisation stimuli, not both. */
 	i_prbs: entity tauhop.prbs31(rtl)
 		generic map(
 			isParallelLoad=>true,
@@ -250,7 +265,7 @@ begin
 			/* Comment-out for simulation. */
 			clk=>irq_write, reset=>reset,
 			en=>trigger,
-			seed=>32x"ace1",        --9x"57",
+			seed=>32x"ace1",
 			prbs=>prbs
 		);
 	
@@ -260,7 +275,7 @@ begin
 		else
 			case i_txFSM is
 				when idle=>
-					if outstandingTransactions>0 then txFSM<=transmitting; end if;
+					if not lastTransaction then txFSM<=transmitting; end if;
 				when transmitting=>
 					if axiMaster_out.tLast then
 						txFSM<=idle;
@@ -282,28 +297,18 @@ begin
 		
 		variable isPktError:boolean;
 		
-		/* Tester variables. */
-		/* Synthesis-only randomisation. */
-		
-		/* Simulation-only randomisation. */
-		/* synthesis translate_off */
-		variable rv0:RandomPType;
-		/* synthesis translate_on */
-		
---		variable trigger:boolean;
 	begin
---		if reset then
-			/* simulation only. */
-			/* synthesis translate_off */
---			rv0.InitSeed(rv0'instance_name);
-			/* synthesis translate_on */
+		/* Asynchronous reset. */
 		if falling_edge(irq_write) then
 			case txFSM is
 				when transmitting=>
-					if trigger then
+					if trigger and not isCovered then
 						/* Pseudorandom stimuli generation using OS-VVM. */
 						/* synthesis translate_off */
-						write(rv0.RandSigned(axiMaster_out.tData'length));
+						rv<=rv0.randCovPoint;
+						rv0.iCover(rv);
+						
+						write(to_signed(rv, axiMaster_out.tData'length));
 						/* synthesis translate_on */
 						
 						/* Pseudorandom stimuli generation using LFSR. */
@@ -322,65 +327,60 @@ begin
 		end if;
 	end process sequencer_op;
 	
+	coverageMonitor: process is
+		procedure initialise is begin
+			/* simulation only. */
+			/* synthesis translate_off */
+			rv0.deallocate;			--destroy rv0 and all bins.
+			rv0.initSeed(rv0'instance_name);
+			/* synthesis translate_on */
+		end procedure initialise;
+		
+	begin
+		/* Fast- and normal-reads. */
+		for i in 0 to 1 loop
+			initialise;
+			rv0.addBins(genBin(integer'low,integer'high,512));
+			
+			wait until isCovered;
+--			rv0.writeBin;
+			rv0.setCovZero;		-- reset all coverage counts to zero.
+		end loop;
+		
+		/* One-shot read. */
+		initialise;
+		rv0.addBins(genBin(integer'low,integer'high,1));
+		
+		wait until isCovered;
+--		rv0.writeBin;
+		rv0.setCovZero;
+		
+        wait for 500 ps;
+        std.env.stop;
+    end process coverageMonitor;
+	
+	process(irq_write) is begin
+		if falling_edge(irq_write) then
+			pctCovered<=rv0.getCov;
+			isCovered<=rv0.isCovered;
+			i_isCovered<=isCovered;
+		end if;
+	end process;
+	
 	sequencer_regs: process(irq_write) is begin
         if falling_edge(irq_write) then
             i_txFSM<=txFSM;
         end if;
     end process sequencer_regs;
     
-    /* Transaction counter. */
-	process(reset,symbolsPerTransfer,irq_write) is begin
-		/* TODO close timing for asynchronous reset. */
-		if reset then outstandingTransactions<=symbolsPerTransfer;
-		elsif rising_edge(irq_write) then
-			if not axiMaster_out.tLast then
-				if outstandingTransactions<1 then
-					outstandingTransactions<=symbolsPerTransfer;
-					report "No more pending transactions." severity note;
-				elsif axiMaster_in.tReady then outstandingTransactions<=outstandingTransactions-1;
-				end if;
-			end if;
-			
-			/* Use synchronous reset for outstandingTransactions to meet timing because it is a huge register set. */
-			if reset then outstandingTransactions<=symbolsPerTransfer; end if;
-		end if;
-	end process;
+	lastTransaction<=true when isCovered else false;
 	
-	/* Reset symbolsPerTransfer to new value (prepare for new transfer) after current transfer has been completed. */
-	process(reset,irq_write) is
-		/* synthesis translate_off */
-		variable rv0:RandomPType;
-		/* synthesis translate_on */
-	begin
-		if reset then
-			/* synthesis translate_off */
-			rv0.InitSeed(rv0'instance_name);
-			symbolsPerTransfer<=120x"0" & rv0.RandUnsigned(8);
-			report "symbols per transfer = 0x" & ieee.numeric_std.to_hstring(rv0.RandUnsigned(axiMaster_out.tData'length)) severity note;
-			/* synthesis translate_on */
-			
-			symbolsPerTransfer<=128x"fc";
-		elsif rising_edge(irq_write) then
-			if axiMaster_out.tLast then
-				/* synthesis only. */
-				/* Testcase 1: number of symbols per transfer becomes 0 after first stream transfer. */
-				--symbolsPerTransfer<=(others=>'0');
-				
-				/* Testcase 2: number of symbols per transfer is randomised. */
-				--uniform(seed0,seed1,rand0);
-				--symbolsPerTransfer<=120x"0" & to_unsigned(integer(rand0 * 2.0**8),8);	--symbolsPerTransfer'length
-				--report "symbols per transfer = " & ieee.numeric_std.to_hstring(to_unsigned(integer(rand0 * 2.0**8),8));	--axiMaster_out.tData'length));
-				
-				
-				/* synthesis translate_off */
-				symbolsPerTransfer<=120x"0" & rv0.RandUnsigned(8);
-				report "symbols per transfer = 0x" & ieee.numeric_std.to_hstring(rv0.RandUnsigned(axiMaster_out.tData'length)) severity note;
-				/* synthesis translate_on */
-				
-				symbolsPerTransfer<=128x"0f";		--128x"ffffffff_ffffffff_ffffffff_ffffffff";
+	checker: process(clk) is begin
+		if rising_edge(clk) then
+			if axiMaster_in.tReady then
+				assert axiMaster_out.tData/="ZZZZZZZZ"
+					report "[Error]: tData must be valid when tReady is asserted at the rising edge of the clock." severity error;
 			end if;
 		end if;
-	end process;
-
---    outstandingTransactions<=128x"fc";      --symbolsPerTransfer;
+	end process checker;
 end architecture rtl;
