@@ -299,7 +299,13 @@ begin
 		
 	begin
 		/* Asynchronous reset. */
-		if falling_edge(irq_write) then
+		if reset then rv<=rv0.randCovPoint; rv0.iCover(rv);
+		elsif falling_edge(irq_write) then
+			if reset then
+				rv<=rv0.randCovPoint;
+				rv0.iCover(rv);
+			end if;
+			
 			case txFSM is
 				when transmitting=>
 					if trigger and not isCovered then
