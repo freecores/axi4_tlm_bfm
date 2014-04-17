@@ -31,7 +31,7 @@
 
 #read -p "press Enter to run full simulation now, or Ctrl-C to exit: ";
 echo $(date "+[%Y-%m-%d %H:%M:%S]: Removing previously-generated files and folders...");
-rm -rf modelsim.ini ./simulate.log ./work ./altera ./osvvm ./tauhop;
+rm -rf ./modelsim.ini ./vsim.wlf ./wlf* ./simulate.log ./work ./altera ./osvvm ./tauhop;
 
 echo $(date "+[%Y-%m-%d %H:%M:%S]: Remove successful.");
 echo $(date "+[%Y-%m-%d %H:%M:%S]: Compiling project...");
@@ -61,6 +61,6 @@ errorStr=`grep "\*\* Error: " ./simulate.log`
 if [ `echo ${#errorStr}` -gt 0 ]
 then echo "Errors exist. Refer simulate.log for more details. Exiting."; exit;
 else
-	vsim -t ps -do ./waves.do -voptargs="+acc" "work.user(rtl)";
+	vsim -t ps -i -do ./waves.do -voptargs="+acc" "work.user(rtl)";
 	echo $(date "+[%Y-%m-%d %H:%M:%S]: simulation loaded.");
 fi

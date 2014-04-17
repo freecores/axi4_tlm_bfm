@@ -1,8 +1,7 @@
 configure wave -signalnamewidth 1
 
 add wave -divider "DUV"
-add wave -position end -decimal sim:/user/symbolsPerTransfer
-add wave -position end -decimal sim:/user/axiMaster/outstandingTransactions
+add wave -position end -decimal sim:/user/axiMaster/lastTransaction
 add wave -position end  sim:/user/axiMaster/axiTxState
 add wave -position end  sim:/user/axiMaster/next_axiTxState
 
@@ -13,6 +12,8 @@ add wave -position end  sim:/user/irq_write
 add wave -position end  sim:/user/axiMaster/trigger
 add wave -position end  sim:/user/axiMaster/i_trigger
 add wave -position end  -hexadecimal sim:/bist/prbs
+add wave -position end  sim:/bist/isCovered
+add wave -position end  sim:/bist/i_isCovered
 
 # Paper publication:
 #add wave -position end  sim:/user/irq_write
@@ -25,7 +26,6 @@ add wave -position end  -hexadecimal sim:/bist/prbs
 
 add wave -position end -expand -hexadecimal sim:/user/axiMaster_in
 add wave -position end -expand -hexadecimal sim:/user/axiMaster_out
-#add wave -position end -expand -hexadecimal sim:/user/axiMaster/i_axiMaster_out
 add wave -position end -decimal sim:/user/readRequest
 add wave -position end -expand -hexadecimal sim:/user/writeRequest
 add wave -position end -decimal sim:/user/readResponse
@@ -49,7 +49,7 @@ add wave -position end  -hexadecimal sim:/bist/i_prbs/d
 add wave -position end  -hexadecimal sim:/bist/i_prbs/seed
 add wave -position end  -hexadecimal sim:/bist/prbs
 
-run 80 ns;
+run -all;
 
 wave zoomfull
 #.wave.tree zoomfull	# with some versions of ModelSim
