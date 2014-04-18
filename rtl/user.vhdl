@@ -66,8 +66,6 @@ architecture rtl of user is
 	
 	/* Global counters. */
 	constant maxSymbols:positive:=2048;		--maximum number of symbols allowed to be transmitted in a frame. Each symbol's width equals tData's width. 
-	signal symbolsPerTransfer:i_transactor.t_cnt;			--TODO deprecate.
-	signal outstandingTransactions:i_transactor.t_cnt;		--TODO deprecate.
 	signal lastTransaction:boolean;
 	
 	/* BFM signalling. */

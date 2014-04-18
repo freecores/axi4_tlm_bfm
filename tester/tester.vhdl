@@ -48,7 +48,6 @@ library osvvm; use osvvm.RandomPkg.all, osvvm.CoveragePkg.all;
 
 
 entity tester is port(
-	/* Comment-out for simulation. */
 	clk,reset:in std_ulogic;
 	
 	/* AXI Master interface */
@@ -56,8 +55,6 @@ entity tester is port(
 	axiMaster_out:in t_axi4StreamTransactor_m2s;
 	
 	/* BFM signalling. */
---	readRequest,writeRequest:t_bfm:=(address=>(others=>'X'),message=>(others=>'X'),trigger=>false);
---	readResponse,writeResponse:t_bfm;
 	readRequest,writeRequest:buffer t_bfm;
 	readResponse,writeResponse:in t_bfm;
 	
@@ -66,13 +63,11 @@ entity tester is port(
 	lastTransaction:out boolean;
 	
 	/* Debug ports. */
---	dataIn:in t_msg;
 	selTxn:in unsigned(3 downto 0)
 );
 end entity tester;
 
 architecture rtl of tester is
---	signal reset:std_ulogic:='0';
 	signal locked:std_ulogic;
 	signal porCnt:unsigned(3 downto 0);
 	signal trigger:boolean;
@@ -91,7 +86,6 @@ architecture rtl of tester is
 	
 	/* Tester signals. */
 	/* synthesis translate_off */
---	signal clk,nReset:std_ulogic:='0';
 	attribute period:time; attribute period of clk:signal is 10 ps;
 	/* synthesis translate_on */
 	
@@ -106,7 +100,9 @@ architecture rtl of tester is
 	signal prbs:t_msg;
 	
 	/* Coverage-driven randomisation. */
+	/* synthesis translate_off */
 	shared variable rv0:covPType;
+	/* synthesis translate_on */
 	signal rv:integer;
 	signal pctCovered:real;
 	signal isCovered,i_isCovered:boolean;
@@ -122,6 +118,7 @@ begin
 */	
 	/* Interrupt-request generator. */
 	trigger<=txFSM/=i_txFSM or writeResponse.trigger;
+--	trigger<=(txFSM/=i_txFSM and txFSM=transmitting) or writeResponse.trigger;	-- fixes bug when multiple transactions occur during endOfTx (this should be illegal).
 	irq_write<=clk when not reset else '0';
 	
 	/* SignalTap II embedded logic analyser. Included as part of BiST architecture. */
@@ -212,7 +209,7 @@ begin
 			wait until falling_edge(clk);
 			axiMaster_in.tReady<=false;
 			
-			--wait until falling_edge(clk);
+			wait until falling_edge(clk);
 			
 			report "coverage: " & to_string(pctCovered) severity note;
 		end loop;
@@ -269,17 +266,28 @@ begin
 			prbs=>prbs
 		);
 	
-	sequencer_ns: process(all) is begin
+	sequencer_ns: process(all) is
+		variable last:boolean;
+	begin
 		txFSM<=i_txFSM;
+		
 		if reset then txFSM<=idle;
 		else
 			case i_txFSM is
 				when idle=>
 					if not lastTransaction then txFSM<=transmitting; end if;
+					last:=false;
 				when transmitting=>
-					if axiMaster_out.tLast then
-						txFSM<=idle;
-					end if;
+					--if axiMaster_out.tLast then
+					--	txFSM<=idle;
+					--end if;
+					
+					/* Fixes multiple transactions when axiTxState=endOfTx. Do not allow 
+						txFSM to enter idle until a tReady has been received after the 
+						last transaction.
+					*/
+					if lastTransaction then last:=true; end if;
+					if axiMaster_in.tReady and last then txFSM<=idle; end if;
 				when others=> null;
 			end case;
 		end if;
@@ -333,13 +341,13 @@ begin
 		end if;
 	end process sequencer_op;
 	
+	
+	/* simulation only. */
+	/* synthesis translate_off */
 	coverageMonitor: process is
 		procedure initialise is begin
-			/* simulation only. */
-			/* synthesis translate_off */
 			rv0.deallocate;			--destroy rv0 and all bins.
 			rv0.initSeed(rv0'instance_name);
-			/* synthesis translate_on */
 		end procedure initialise;
 		
 	begin
@@ -372,6 +380,8 @@ begin
 			i_isCovered<=isCovered;
 		end if;
 	end process;
+	/* synthesis translate_on */
+	
 	
 	sequencer_regs: process(irq_write) is begin
         if falling_edge(irq_write) then

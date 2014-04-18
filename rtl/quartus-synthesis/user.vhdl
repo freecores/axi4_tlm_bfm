@@ -49,14 +49,14 @@ library altera; use altera.stp;
 
 entity user is port(
 	/* Comment-out for simulation. */
-	clk,reset:in std_ulogic;
+	clk,nReset:in std_ulogic;
 	
 	/* AXI Master interface */
 --	axiMaster_in:in t_axi4StreamTransactor_s2m;
-	axiMaster_out:buffer t_axi4StreamTransactor_m2s;
+	axiMaster_out:buffer t_axi4StreamTransactor_m2s
 	
 	/* Debug ports. */
-	selTxn:in unsigned(3 downto 0):=x"0"
+--	selTxn:in unsigned(3 downto 0):=x"5"	-- select PRBS by default.
 );
 end entity user;
 
@@ -66,8 +66,8 @@ architecture rtl of user is
 	
 	/* Global counters. */
 	constant maxSymbols:positive:=2048;		--maximum number of symbols allowed to be transmitted in a frame. Each symbol's width equals tData's width. 
-	signal symbolsPerTransfer:t_cnt;
-	signal outstandingTransactions:t_cnt;
+	
+	signal lastTransaction:boolean;
 	
 	/* BFM signalling. */
 	signal readRequest,writeRequest:t_bfm:=(address=>(others=>'X'),message=>(others=>'X'),trigger=>false);
@@ -75,7 +75,7 @@ architecture rtl of user is
 	
 	/* Tester signals. */
 	/* synthesis translate_off */
-	signal clk,reset:std_ulogic:='0';
+	signal clk,nReset:std_ulogic:='0';
 	attribute period:time; attribute period of clk:signal is 10 ps;
 	/* synthesis translate_on */
 	
@@ -85,6 +85,8 @@ architecture rtl of user is
 	
 	signal axiMaster_in:t_axi4StreamTransactor_s2m;
 	signal irq_write:std_ulogic;		-- clock gating.
+	
+	signal selTxn:unsigned(3 downto 0):=4x"0";	-- select PRBS by default.
 	
 begin
 	/* Bus functional models. */
@@ -97,15 +99,14 @@ begin
 			axiMaster_in=>axiMaster_in,
 			axiMaster_out=>axiMaster_out,
 			
-			symbolsPerTransfer=>symbolsPerTransfer,
-			outstandingTransactions=>outstandingTransactions,
+			lastTransaction=>lastTransaction,
 			dbg_axiTxFSM=>dbg_axiTxFSM
 	);
 	
 	/* Clocks and reset. */
 	/* Power-on Reset circuitry. */
-	por: process(reset,clk) is begin
-		if reset then i_reset<='1'; porCnt<=(others=>'1');
+	por: process(nReset,clk) is begin
+		if not nReset then i_reset<='1'; porCnt<=(others=>'1');
 		elsif rising_edge(clk) then
 			i_reset<='0';
 			
@@ -116,9 +117,9 @@ begin
 	/* synthesis translate_off */
 	clk<=not clk after clk'period/2;
 	process is begin
-		reset<='0'; wait for 1 ps;
-		reset<='1'; wait for 500 ps;
-		reset<='0';
+		nReset<='0'; wait for 1 ps;
+		nReset<='1'; wait for 500 ps;
+		nReset<='0';
 		wait;
 	end process;
 	/* synthesis translate_on */
@@ -126,15 +127,14 @@ begin
 	/* Simulation Tester. */
 	
 	/* Hardware tester. */
-	bist: entity work.tester(rtl) port map(
+	bist: entity work.tester(cdcrv) port map(
 		clk=>clk, reset=>i_reset,
 		axiMaster_in=>axiMaster_in,
 		axiMaster_out=>axiMaster_out,
 		readRequest=>readRequest, writeRequest=>writeRequest,
 		readResponse=>readResponse, writeResponse=>writeResponse,
 		irq_write=>irq_write,
-		symbolsPerTransfer=>symbolsPerTransfer,
-		outstandingTransactions=>outstandingTransactions,
+		lastTransaction=>lastTransaction,
 		selTxn=>selTxn
 	);
 end architecture rtl;

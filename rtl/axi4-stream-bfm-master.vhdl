@@ -55,8 +55,6 @@ entity axiBfmMaster is
 --		axiSlave_in:in tAxi4Transactor_m2s;
 --		axiSlave_out:buffer tAxi4Transactor_s2m;
 		
---		symbolsPerTransfer:in i_transactor.t_cnt;
---		outstandingTransactions:in i_transactor.t_cnt;
 		lastTransaction:in boolean;
 		
 		/* Debug ports. */
@@ -74,8 +72,6 @@ architecture rtl of axiBfmMaster is
 	signal i_trigger,trigger:boolean;
 	
 	/* BFM signalling. */
---	signal i_readRequest,i_writeRequest:i_transactor.t_bfm:=(address=>(others=>'X'),message=>(others=>'X'),trigger=>false);
---	signal i_readResponse,i_writeResponse:i_transactor.t_bfm;
 	signal i_writeRequest:i_transactor.t_bfm:=(address=>(others=>'X'),message=>(others=>'X'),trigger=>false);
 	signal i_writeResponse:i_transactor.t_bfm;
 	
@@ -94,7 +90,7 @@ begin
 				when payload=>
 					if lastTransaction then axiTxState<=endOfTx; end if;
 				when endOfTx=>
-					axiTxState<=idle;
+					if axiMaster_in.tReady then axiTxState<=idle; end if;
 				when others=>axiTxState<=idle;
 			end case;
 		end if;
@@ -104,6 +100,7 @@ begin
 	axi_bfmTx_op: process(all) is begin
 		i_writeResponse<=writeResponse;
 		
+		i_axiMaster_out<=axiMaster_out;
 		i_axiMaster_out.tLast<=false;
 		i_writeResponse.trigger<=false;
 		
@@ -133,7 +130,7 @@ begin
 	
 	/* state registers and pipelines for AXI4-Stream Tx BFM. */
 	process(aclk) is begin
-		if falling_edge(aclk) then
+		if rising_edge(aclk) or falling_edge(aclk) then
 			next_axiTxState<=axiTxState;
 			i_writeRequest<=writeRequest;
 			writeResponse<=i_writeResponse;
@@ -141,6 +138,15 @@ begin
 			trigger<=i_trigger;
 		end if;
 	end process;
+	
+	/*
+	fastPipelines: entity work.ddr(rtl) generic map(busWidth=>8)
+		port map(reset=>reset,
+			clk=>aclk,
+			d=>next_axiTxState,
+			q=>axiTxState
+		);
+	*/
 	
 	dbg_axiTxFSM<=axiTxState;
 end architecture rtl;
